@@ -3,6 +3,23 @@
 Prolog basics smuggled into the TypeScript type system as literal types, targeting
 the TS 7 native (Go) compiler, where the same type-level programs just run faster.
 
+```ts
+import type { Query } from "ts-prolog";
+
+type Src = [
+  "parent(tom, bob)",
+  "parent(bob, ann)",
+  "ancestor(X, Y) :- parent(X, Y)",
+  "ancestor(X, Z) :- parent(X, Y), ancestor(Y, Z)",
+];
+type A = Query<"ancestor(A, ann)", Src>;
+//   ^? [["ancestor", "bob", "ann"], ["ancestor", "tom", "ann"]]
+```
+
+Everything runs inside `tsc --noEmit`: parsing the clause strings, unification,
+SLD resolution with backtracking, cut, negation-as-failure. No codegen, no
+plugins, no runtime.
+
 ## TOC
 
 - [Status](#status)
@@ -135,6 +152,7 @@ Results land in bench/results.jsonl.
 | permutations of a 4-list | 24 | 31ms | 1351ms | yes |
 | 3-coloring Australia (6 regions) | 6 | 31ms | 548ms | yes |
 | naive reverse of a 6-list | 1 | 31ms | 364ms | yes |
+| mini-zebra, 3 houses (who owns the fish) | 1 | 32ms | 484ms | yes |
 
 Startup baselines: swipl 67ms, npx+tsgo 1781ms cold / ~400ms warm. Wall
 clock is all process startup on both sides; net solve time is

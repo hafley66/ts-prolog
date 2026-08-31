@@ -36,6 +36,8 @@ def normalize(problem, answer):
         return {"p": uncons(answer[2])}
     if problem == "color":
         return {"c": answer[1:7]}
+    if problem == "puzzle":
+        return {"who": answer[1]}
     if problem == "nrev":
         return {"r": uncons(answer[2])}
     raise ValueError(problem)
