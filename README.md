@@ -9,6 +9,7 @@ the TS 7 native (Go) compiler, where the same type-level programs just run faste
 - [Thesis](#thesis)
 - [The question](#the-question)
 - [Demos](#demos)
+- [Racing SWI-Prolog](#racing-swi-prolog)
 - [Layout](#layout)
 - [Known limits to probe](#known-limits-to-probe)
 - [Non-goals](#non-goals)
@@ -114,6 +115,26 @@ call site; every negative case is pinned with `@ts-expect-error`.
 | demos/di.test-d.ts | dependency lists + recursive `wired` | `resolve("worker")` (missing `queue`) |
 | demos/semver.test-d.ts | one shared logic var across goals = constraint solver | `install("v3")` |
 | demos/exhaustive.test-d.ts | derived handled-set compared against a union | `Exclude` names the missing `"keydown"` |
+
+## Racing SWI-Prolog
+
+`bash bench/race.sh`: SWI-Prolog 10.0.2 solves each problem and writes its
+answers as JSONL; bench/gen_ts.py converts that JSONL into `Equal`
+assertions; tsgo must solve the same query and prove answer-for-answer,
+order-for-order agreement. A wrong or reordered answer fails the build.
+Results land in bench/results.jsonl.
+
+| problem | answers | swipl wall | tsgo wall | net solve (minus startup) | agree |
+| --- | --- | --- | --- | --- | --- |
+| append splits of an 8-list | 9 | 138ms | 1824ms | ~70ms vs ~40ms | yes |
+| ancestor over a 10-chain | 10 | 38ms | 1444ms | ~0ms vs ~0ms | yes |
+| peano pairs summing to 6 | 7 | 99ms | 1281ms | ~30ms vs ~0ms | yes |
+
+Startup baselines: swipl 67ms, npx+tsgo 1781ms. Wall clock is all process
+startup on both sides; net solve time is single-digit-to-tens of ms for both
+engines at these sizes. The difference is capacity: SWI runs these at n in
+the millions, the type checker runs out of fuel at n around 60 for deep
+terms and ~250 inference steps for flat ones.
 
 ## Layout
 

@@ -1,0 +1,6 @@
+{"problem":"splits","engine":"swipl","ms":138}
+{"problem":"chain","engine":"swipl","ms":38}
+{"problem":"peano","engine":"swipl","ms":99}
+{"problem":"splits","engine":"tsgo","ms":1824,"verified":true}
+{"problem":"chain","engine":"tsgo","ms":1444,"verified":true}
+{"problem":"peano","engine":"tsgo","ms":1281,"verified":true}
