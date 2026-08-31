@@ -6,7 +6,7 @@ mkdir -p bench/out
 
 ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
 
-declare -a problems=(splits chain peano hanoi perm color nrev puzzle collect queens)
+declare -a problems=(splits chain peano hanoi perm color nrev puzzle collect queens pyth)
 
 for p in "${problems[@]}"; do
   s=$(ms)

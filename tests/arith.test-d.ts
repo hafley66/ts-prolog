@@ -22,6 +22,40 @@ type _lt = Expect<Equal<QueryM<["lt", 3, 5], []>["length"], 1>>;
 type _lt_eq = Expect<Equal<QueryM<["lt", 5, 5], []>, []>>;
 type _lt_gt = Expect<Equal<QueryM<["lt", 7, 5], []>, []>>;
 
+// times/3: all three modes; the division modes require exactness
+type _t_fwd = Expect<
+  Equal<QueryM<["times", 6, 7, Var<"Z">], []>, [["times", 6, 7, 42]]>
+>;
+type _t_back1 = Expect<
+  Equal<QueryM<["times", Var<"X">, 7, 42], []>, [["times", 6, 7, 42]]>
+>;
+type _t_back2 = Expect<
+  Equal<QueryM<["times", 6, Var<"Y">, 42], []>, [["times", 6, 7, 42]]>
+>;
+type _t_inexact = Expect<Equal<QueryM<["times", 5, Var<"Y">, 42], []>, []>>;
+type _t_zero = Expect<
+  Equal<QueryM<["times", 0, 5, Var<"Z">], []>, [["times", 0, 5, 0]]>
+>;
+// 0 * Y = 0 admits every Y: fail like SWI's instantiation error
+type _t_zero_rel = Expect<Equal<QueryM<["times", 0, Var<"Y">, 0], []>, []>>;
+type _t_parse = Expect<
+  Equal<Query<"times(6, X, 42)", []>, [["times", 6, 7, 42]]>
+>;
+
+// between/3 generates ascending, keeping the original bounds in the answer
+type _b_gen = Expect<
+  Equal<
+    QueryM<["between", 2, 5, Var<"X">], []>,
+    [["between", 2, 5, 2], ["between", 2, 5, 3], ["between", 2, 5, 4], ["between", 2, 5, 5]]
+  >
+>;
+type _b_one = Expect<
+  Equal<QueryM<["between", 3, 3, Var<"X">], []>, [["between", 3, 3, 3]]>
+>;
+type _b_empty = Expect<Equal<QueryM<["between", 5, 2, Var<"X">], []>, []>>;
+type _b_check = Expect<Equal<QueryM<["between", 2, 5, 4], []>["length"], 1>>;
+type _b_out = Expect<Equal<QueryM<["between", 2, 5, 7], []>, []>>;
+
 // prelude length/2 bridges lists to native numbers through plus
 type _len = Expect<
   Equal<Query<"length([a, b, c], N)", Prelude>, [["length", Term<"[a, b, c]">, 3]]>

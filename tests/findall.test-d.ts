@@ -1,4 +1,5 @@
 import type { Var } from "../src/01-term";
+import type { QueryM } from "../src/04-machine";
 import type { Query, Term } from "../src/05-parse";
 import type { Equal, Expect } from "./util";
 
@@ -30,6 +31,28 @@ type _count = Expect<
 >;
 type _count_deep = Expect<
   Equal<Query<"nkids(bob, N)", Src>, [["nkids", "bob", ["s", "z"]]]>
+>;
+
+// copy semantics match SWI: a free goal var is NOT aliased into the answers.
+// SWI: findall(X, mem2(X,[Y,b]), L), Y = a  ~>  L = [_G, b], first elem free.
+// The sub-derivation freshens Y, so the collected element is that fresh var
+// (name = freshen suffix at the findall's chunk/fuel position), and the later
+// Y = a binding cannot reach it.
+type AliasDB = [
+  [["mem2", Var<"X">, ["cons", Var<"X">, Var<"T">]]],
+  [["mem2", Var<"X">, ["cons", Var<"H">, Var<"T">]], ["mem2", Var<"X">, Var<"T">]],
+  [["eq", Var<"E">, Var<"E">]],
+  [
+    ["alias", Var<"Y">, Var<"L">],
+    ["findall", Var<"X">, ["mem2", Var<"X">, ["cons", Var<"Y">, ["cons", "b", "nil"]]], Var<"L">],
+    ["eq", Var<"Y">, "a"],
+  ],
+];
+type _copy_semantics = Expect<
+  Equal<
+    QueryM<["alias", Var<"Y">, Var<"L">], AliasDB>,
+    [["alias", "a", ["cons", Var<"X.0x4f0x0">, ["cons", "b", "nil"]]]]
+  >
 >;
 
 // findall sees the frame-local DB: asserted facts are collected

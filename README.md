@@ -27,6 +27,7 @@ and `npm run check:tsc` (3.0s) verify 12 test suites and 7 demo files.
 
 - [What works](#what-works)
 - [Racing SWI-Prolog](#racing-swi-prolog)
+- [Where it stops](#where-it-stops)
 - [Which TypeScript](#which-typescript)
 - [Demos: types that enforce rules](#demos-types-that-enforce-rules)
 - [Closing the loop: types that cause effects](#closing-the-loop-types-that-cause-effects)
@@ -47,8 +48,9 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 | cut | `"!"` -> stack-truncation barrier | done |
 | negation, once, meta-call | library clauses; a var as a goal executes its binding | done via cut |
 | asserta / assertz / retract | frame-local DB rebuilt per continuation | done; backtracking undoes changes (SWI asserts survive) |
-| findall/3 | sub-derivation inside a machine step | done, sees the dynamic DB |
-| arithmetic: plus/3, lt/2, neq/2 | native number literals, tuple-length math; plus is relational | done, values bounded ~1000 |
+| findall/3 | sub-derivation inside a machine step | done, sees the dynamic DB; copy semantics match SWI (free goal vars are not aliased into answers) |
+| arithmetic: plus/3, times/3, lt/2, neq/2 | native number literals, tuple-length math; plus and times are relational (times division must be exact) | done, operands bounded 999, products bounded 9999 |
+| between/3 | choicepoint per value, ascending | done, spans bounded 998 values |
 | higher-order goals | var in functor position; `maplist` runs forwards AND backwards | done |
 | surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/05-parse.ts) |
 | prelude | `not/once/member/append/select/length` as `Prelude` | done (src/06-prelude.ts) |
@@ -59,21 +61,22 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 `npm run race`: SWI-Prolog 10.0.2 solves each problem and emits answers as
 JSONL; generated `Equal` assertions force tsgo to solve the same query and
 prove answer-for-answer, order-for-order agreement; a third lane extracts
-answers back out of the checker and diffs them against SWI. All 10 problems,
+answers back out of the checker and diffs them against SWI. All 11 problems,
 all lanes: exact match.
 
 | problem | answers | swipl | tsgo | agree |
 | --- | --- | --- | --- | --- |
-| append splits of an 8-list | 9 | 38ms | 486ms | yes |
-| ancestor over a 10-chain | 10 | 29ms | 436ms | yes |
-| peano pairs summing to 6 | 7 | 28ms | 340ms | yes |
-| towers of hanoi, 3 disks | 1 (7 moves) | 31ms | 378ms | yes |
-| permutations of a 4-list | 24 | 31ms | 1351ms | yes |
-| 3-coloring Australia (6 regions) | 6 | 31ms | 548ms | yes |
-| naive reverse of a 6-list | 1 | 31ms | 364ms | yes |
-| mini-zebra, 3 houses (who owns the fish) | 1 | 32ms | 484ms | yes |
-| findall + peano count of kids per parent | 3 | 37ms | 435ms | yes |
-| 4-queens (native number arithmetic) | 2 | 32ms | 1774ms | yes |
+| append splits of an 8-list | 9 | 75ms | 397ms | yes |
+| ancestor over a 10-chain | 10 | 33ms | 549ms | yes |
+| peano pairs summing to 6 | 7 | 36ms | 398ms | yes |
+| towers of hanoi, 3 disks | 1 (7 moves) | 40ms | 471ms | yes |
+| permutations of a 4-list | 24 | 37ms | 1526ms | yes |
+| 3-coloring Australia (6 regions) | 6 | 38ms | 739ms | yes |
+| naive reverse of a 6-list | 1 | 38ms | 460ms | yes |
+| mini-zebra, 3 houses (who owns the fish) | 1 | 33ms | 626ms | yes |
+| findall + peano count of kids per parent | 3 | 37ms | 437ms | yes |
+| 4-queens (native number arithmetic) | 2 | 35ms | 1676ms | yes |
+| pythagorean triples, legs to 13 (between + times) | 4 | 37ms | 2136ms | yes |
 
 Wall clock is mostly process startup on both sides (swipl 67ms, npx+tsgo
 ~400ms warm); net solve is tens of ms for both at these sizes. The real gap
@@ -105,6 +108,35 @@ whose `Project.checker` exposes `getTypeAtLocation` and `typeToString`
 compiler-API lane (tools/print-type.mjs, kept for reference).
 
 </details>
+
+## Where it stops
+
+Bisected ceilings, exact to the unit (bench/limits/probe.py; raw runs in
+bench/limits/results.jsonl). SWI runs every row at n orders of magnitude
+higher; each ceiling below is a checker limit, and each maps to one of three
+walls.
+
+| probe | last pass | first fail | error | wall |
+| --- | --- | --- | --- | --- |
+| plus operand value | 999 | 1000 | TS2589 | Rep tail-recursion cap: `Rep<1000>` is 1000 non-fuel-chunked iterations |
+| plus result value (X + n = 2n) | 998 (n=499) | 1000 | TS2589 | same cap, reached through `Rep<2n>` |
+| times product | 9801 (99x99) | 10000 (100x100) | TS2799 | tuple hard cap at 10000 elements |
+| times division (n * Y = n^2) | n=31 (961) | n=32 (1024) | TS2589 | Rep cap again, on the product operand |
+| between span | 998 | 999 | TS2589 | Rep cap on the bound |
+| unification nesting depth `f(f(...))` | 95 | 96 | TS2589 | Unify recurses per nesting level, not fuel-chunked |
+| parser nesting depth `f(f(...))` | 91 | 92 | TS2589 | same shape in the template-literal parser |
+| parser flat arity `f(a, ..., a)` | 500+ | - | - | flat scans are tail-recursive, no wall found |
+| flat conjunction goal count | 304 | 305 | TS2589 | per-step goal-list rewrite, work = steps x state |
+| naive reverse list length | 30 | 31 | TS2589 | O(n^2) steps on a growing term |
+| ancestor chain length | 38 | 39 | TS2589 | answer tuple + goal list both grow with n |
+| n-queens | 4 | 5 | TS2589 | search volume x state size |
+| 5-house zebra clue count | 4 of 14 | 5 | TS2589 | dies in ~4s / 1.3GB; full puzzle needs ~3x the work budget |
+
+Peak checker RSS scales with the grind: passing runs near a wall hit 3-4GB
+(flat n=304: 3.6GB; nrev n=30: 3.5GB). One engine bug fell out of the
+between probe: embedding a lazy `Sum<L, 1>` in the retry goal chained
+`Sum<Sum<...>>` one level per generated value and died at 31; forcing it to
+a literal first (`extends infer L2 extends number`) moved the ceiling to 998.
 
 ## Which TypeScript
 

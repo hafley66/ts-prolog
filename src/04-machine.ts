@@ -128,6 +128,33 @@ type Diff<C extends number, A extends number> = Rep<C> extends [
   ? R["length"]
   : false;
 
+// A*B by repeated concat of a cached Rep<A>; tail-recursive over B
+type MulT<
+  RA extends readonly 0[],
+  B extends readonly 0[],
+  Acc extends readonly 0[],
+> = B extends readonly [0, ...infer R extends readonly 0[]]
+  ? MulT<RA, R, [...Acc, ...RA]>
+  : Acc["length"];
+
+type Mul<A extends number, B extends number> = MulT<Rep<A>, Rep<B>, []>;
+
+// Z / X exact via repeated subtraction; false on remainder, and on X = 0
+// (X = 0, Z = 0 admits every Y: fail like SWI's instantiation error)
+type DivT<
+  RX extends readonly 0[],
+  RZ extends readonly 0[],
+  Q extends readonly 0[],
+> = RZ extends readonly []
+  ? Q["length"]
+  : RZ extends readonly [...RX, ...infer R extends readonly 0[]]
+    ? DivT<RX, R, [...Q, 0]>
+    : false;
+
+type DivExact<Z extends number, X extends number> = X extends 0
+  ? false
+  : DivT<Rep<X>, Rep<Z>, []>;
+
 // unify Slot with the computed value, substitute into the continuation
 type ArithBind<
   Slot,
@@ -165,6 +192,26 @@ type PlusStep<
   : Y extends number
     ? Z extends number
       ? ArithBind<X, Diff<Z, Y>, RGoals, A, FDB>
+      : false
+    : false;
+
+// relational times/3: any one argument may be the unknown; division is exact
+type TimesStep<
+  X,
+  Y,
+  Z,
+  RGoals extends readonly unknown[],
+  A,
+  FDB extends readonly unknown[],
+> = X extends number
+  ? Y extends number
+    ? ArithBind<Z, Mul<X, Y>, RGoals, A, FDB>
+    : Z extends number
+      ? ArithBind<Y, DivExact<Z, X>, RGoals, A, FDB>
+      : false
+  : Y extends number
+    ? Z extends number
+      ? ArithBind<X, DivExact<Z, Y>, RGoals, A, FDB>
       : false
     : false;
 
@@ -247,6 +294,36 @@ export type Run<
                   ? Run<Rest, Ans, P, C, [...F, 0]>
                   : Run<[[RGoals, A, FDB, FDB], ...Rest], Ans, P, C, [...F, 0]>
                 : Run<[[RGoals, A, FDB, FDB], ...Rest], Ans, P, C, [...F, 0]>
+            : Goals extends readonly [
+                  ["times", infer X, infer Y, infer Z],
+                  ...infer RGoals extends readonly unknown[],
+                ]
+              ? TimesStep<X, Y, Z, RGoals, A, FDB> extends infer F2
+                ? F2 extends false
+                  ? Run<Rest, Ans, P, C, [...F, 0]>
+                  : Run<[F2, ...Rest], Ans, P, C, [...F, 0]>
+                : never
+            : Goals extends readonly [
+                  ["between", infer L extends number, infer H extends number, infer X],
+                  ...infer RGoals extends readonly unknown[],
+                ]
+              ? Rep<H> extends [...Rep<L>, ...unknown[]]
+                // force Sum to a literal now: a lazy Sum<Sum<...>> chain in the
+                // retry goal deepens instantiation once per generated value
+                ? Sum<L, 1> extends infer L2 extends number
+                  ? ArithBind<X, L, RGoals, A, FDB> extends infer F2
+                    ? F2 extends false
+                      ? Run<
+                          [[[["between", L2, H, X], ...RGoals], A, FDB, FDB], ...Rest],
+                          Ans, P, C, [...F, 0]
+                        >
+                      : Run<
+                          [F2, [[["between", L2, H, X], ...RGoals], A, FDB, FDB], ...Rest],
+                          Ans, P, C, [...F, 0]
+                        >
+                    : never
+                  : never
+                : Run<Rest, Ans, P, C, [...F, 0]>
             : Goals extends readonly [
                   ["findall", infer T, infer G, infer R],
                   ...infer RGoals extends readonly unknown[],

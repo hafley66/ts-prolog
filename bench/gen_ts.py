@@ -193,6 +193,20 @@ PROBLEMS = {
         '["queens", Var<"Qs">]',
         lambda r: f'["queens", {cons_raw([str(int(x)) for x in r["q"]])}]',
     ),
+    "pyth": (
+        clauses(
+            '[\n    ["pyth", Var<"X">, Var<"Y">, Var<"Z">],\n'
+            '    ["between", 1, 13, Var<"X">],\n'
+            '    ["between", Var<"X">, 13, Var<"Y">],\n'
+            '    ["times", Var<"X">, Var<"X">, Var<"XX">],\n'
+            '    ["times", Var<"Y">, Var<"Y">, Var<"YY">],\n'
+            '    ["plus", Var<"XX">, Var<"YY">, Var<"ZZ">],\n'
+            '    ["between", Var<"Y">, 20, Var<"Z">],\n'
+            '    ["times", Var<"Z">, Var<"Z">, Var<"ZZ">],\n  ]',
+        ),
+        '["pyth", Var<"X">, Var<"Y">, Var<"Z">]',
+        lambda r: f'["pyth", {r["x"]}, {r["y"]}, {r["z"]}]',
+    ),
     "nrev": (
         clauses(
             *APP,
