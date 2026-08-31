@@ -5,11 +5,36 @@ the TS 7 native (Go) compiler, where the same type-level programs just run faste
 
 ## TOC
 
+- [Status](#status)
 - [Thesis](#thesis)
 - [The question](#the-question)
-- [Prolog model vs TS type system](#prolog-model-vs-ts-type-system)
+- [Layout](#layout)
 - [Known limits to probe](#known-limits-to-probe)
 - [Non-goals](#non-goals)
+
+## Status
+
+MVP works: unification, an ordered clause database, and SLD resolution with
+full backtracking run entirely in the type system, checked by both `tsgo`
+(7.0.0-dev.20260707.2) and `tsc` 7.0.2 with zero errors.
+
+| proven | test | evidence |
+| --- | --- | --- |
+| two-way unification, var-var aliasing, nested terms | tests/unify.test-d.ts | 9 assertions |
+| facts, rules, recursion, backward queries | tests/family.test-d.ts | `ancestor(A, ann)` enumerates `[bob, tom]` |
+| multiple answers in clause order | tests/append.test-d.ts | `append(A, B, [1,2])` yields all 3 splits |
+| relational arithmetic | tests/peano.test-d.ts | `add(A, B, 2)` yields all 3 pairs, `mul(2,2,4)` |
+
+`npm run check` (tsgo): 0.24s. `npm run check:tsc`: 0.69s. Same machine, all
+four suites.
+
+Verdict so far: `infer` alone is one-way matching, and that is enough. Real
+unification comes from threading a substitution type through elementwise
+conditional recursion (`src/unify.ts`). Backtracking needs no distribution
+trick: trying clauses in tuple order and concatenating the solution tuples of
+each branch (`src/solve.ts`) is exactly SLD search, with `[]` as failure.
+Standardize-apart falls out of template literal types: clause vars get a
+derivation-depth suffix.
 
 ## Thesis
 
@@ -29,25 +54,38 @@ to treat the checker as an interpreter.
 Is `infer`-based matching plus union distribution plus recursive aliases enough to
 express:
 
-| Prolog piece | candidate TS encoding | open? |
+| Prolog piece | TS encoding | status |
 | --- | --- | --- |
-| terms | literal types, tuples, template literal types | encodable |
-| unification | conditional `extends` with `infer`, both-direction checks | partially, one-way by default |
-| variables / bindings | `infer` captures threaded through an env object type | open |
-| clause database | union of tuple-encoded clauses | encodable |
-| resolution / SLD search | recursive conditional types over the clause union | open |
-| backtracking | distributive conditionals as branch-and-fail (`never` = fail) | open |
+| terms | string literals, `Var<N>` objects, tuples (src/term.ts) | done |
+| unification | subst threaded through recursive conditionals (src/unify.ts) | done, no occurs check |
+| variables / bindings | intersection-accumulated subst object, `Walk` deref | done |
+| clause database | ordered tuple of `[Head, ...Body]` tuples | done |
+| resolution / SLD search | `Solve` recursion over goal list (src/solve.ts) | done |
+| backtracking | per-clause solution tuples concatenated in order | done |
+| standardize-apart | template literal rename `X -> X.depth` | done |
 | occurs check, cyclic terms | none known | open |
 | cut, negation-as-failure | `never` propagation tricks | open |
+| arithmetic beyond peano | intrinsic string/number types? | open |
+
+## Layout
+
+| path | holds |
+| --- | --- |
+| src/term.ts | `Var`, `Term`, `Subst`, `Walk`, `Bind` |
+| src/unify.ts | `Unify` (subst or `false`) |
+| src/solve.ts | `Freshen`, `Solve`, `Resolve`, `Query` |
+| tests/*.test-d.ts | `Expect<Equal<...>>` assertions, checked at compile time |
 
 ## Known limits to probe
 
-- Instantiation depth limits (raised or unchanged in tsgo?).
-- `infer` is match-time only; no persistent mutable binding store, so the
-  environment must be threaded as an accumulator type.
-- Distribution gives all-branches evaluation, and Prolog wants ordered clause
-  trial with cut; ordering may need tuple-encoded clause lists instead of unions.
-- Tail-recursive alias elimination: which shapes tsc optimizes vs stack-overflows.
+- Instantiation depth ceiling: find the list length / derivation depth where
+  each compiler dies, compare tsgo vs tsc.
+- Left-recursive clauses (`ancestor(X,Z) :- ancestor(X,Y), ...`) loop forever
+  in real Prolog; measure what the checker does (depth error vs hang).
+- No occurs check: `X = f(X)` will build a cyclic subst and `Walk` will not
+  terminate; decide whether to add the check or document the crash.
+- Cut and negation-as-failure need first-solution-only evaluation; `Solve`
+  currently always enumerates everything.
 - Whether template literal type inference (multiple `infer` holes in one string)
   counts as a second unification engine with different power.
 

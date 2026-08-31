@@ -1,0 +1,13 @@
+{
+  "name": "ts-prolog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsgo --noEmit -p .",
+    "check:tsc": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2"
+  }
+}
