@@ -97,8 +97,9 @@ express:
 | resolution / SLD search | `Solve` recursion over goal list (src/solve.ts) | done |
 | backtracking | per-clause solution tuples concatenated in order | done |
 | standardize-apart | template literal rename `X -> X.depth` | done |
-| occurs check, cyclic terms | none known | open |
-| cut, negation-as-failure | `never` propagation tricks | open |
+| occurs check | iterative worklist walk before every bind (src/unify.ts) | done |
+| cut | `"!"` -> `["$cut", N]` barrier, stack truncation (src/machine.ts) | done, machine only |
+| negation-as-failure, once, meta-call | library clauses: `not(G) :- G, !, fail. not(_).` — a var as a goal executes its binding | done via cut |
 | arithmetic beyond peano | intrinsic string/number types? | open |
 
 ## Demos
@@ -174,18 +175,19 @@ leaving the checker (see tyvm), which forfeits the whole point of running in
 | src/machine.ts | trampolined `Run`/`QueryM`: tail-recursive SLD loop, iterative resolver |
 | tests/*.test-d.ts | `Expect<Equal<...>>` assertions, checked at compile time |
 
-## Known limits to probe
+## Measured limits
 
-- Instantiation depth ceiling: find the list length / derivation depth where
-  each compiler dies, compare tsgo vs tsc.
-- Left-recursive clauses (`ancestor(X,Z) :- ancestor(X,Y), ...`) loop forever
-  in real Prolog; measure what the checker does (depth error vs hang).
-- No occurs check: `X = f(X)` will build a cyclic subst and `Walk` will not
-  terminate; decide whether to add the check or document the crash.
-- Cut and negation-as-failure need first-solution-only evaluation; `Solve`
-  currently always enumerates everything.
-- Whether template literal type inference (multiple `infer` holes in one string)
-  counts as a second unification engine with different power.
+- Forward append ceiling n = 60 (unchanged after adding the occurs check),
+  ~250 flat inference steps, ~5M instantiation count per check run.
+- Two variable-free cons chains unify up to depth 80, die by 120:
+  `UnifyArgs` descends non-tail per element pair.
+- Left recursion (`anc(X,Z) :- anc(X,Y), ...` listed first) burns fuel and
+  dies as TS2589 after ~6s. The checker cannot hang forever; nontermination
+  degrades to an error, unlike real Prolog.
+- Cut in the query itself is not transformed (only clause bodies);
+  `["$cut", N]` is reserved.
+- Open: whether template literal inference (multiple `infer` holes in one
+  string) is a second unification engine with different power.
 
 ## Non-goals
 

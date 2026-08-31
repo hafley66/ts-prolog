@@ -25,6 +25,21 @@ type RTerm<
     ? RTerm<PIn, [...PDone, Done], Rest, S>
     : Done;
 
+// "!" in a clause body becomes ["$cut", N]: N = stack depth below this
+// goal's alternatives, the barrier to truncate back to
+type Arm<Body, N extends number> = {
+  [K in keyof Body]: Body[K] extends "!" ? ["$cut", N] : Body[K];
+};
+
+type Trunc<
+  S extends readonly unknown[],
+  N extends number,
+> = S["length"] extends N
+  ? S
+  : S extends readonly [unknown, ...infer R extends readonly unknown[]]
+    ? Trunc<R, N>
+    : S;
+
 // per-step subst is applied to goals + answer then discarded:
 // instantiation depth tracks term depth, never derivation length
 type Step<
@@ -33,10 +48,11 @@ type Step<
   RGoals extends readonly unknown[],
   A,
   DB extends readonly unknown[],
+  CutN extends number,
 > = Cl extends readonly [infer H, ...infer Body extends readonly unknown[]]
   ? Unify<G, H, {}> extends infer S2
     ? S2 extends Subst
-      ? RTerm<[[...Body, ...RGoals], A], [], [], S2> extends [
+      ? RTerm<[[...Arm<Body, CutN>, ...RGoals], A], [], [], S2> extends [
           infer Goals2 extends readonly unknown[],
           infer A2,
         ]
@@ -56,9 +72,21 @@ export type Run<
   ? Top extends readonly [infer Goals extends readonly unknown[], infer A, infer Cs]
     ? Goals extends readonly []
       ? Run<Rest, DB, [...Ans, A], K>
-      : Cs extends readonly [infer Cl, ...infer MoreCs]
+      : Goals extends readonly [
+            ["$cut", infer N extends number],
+            ...infer RGoals extends readonly unknown[],
+          ]
+        ? Run<[[RGoals, A, DB], ...Trunc<Rest, N>], DB, Ans, K>
+        : Cs extends readonly [infer Cl, ...infer MoreCs]
         ? Goals extends readonly [infer G, ...infer RGoals extends readonly unknown[]]
-          ? Step<Freshen<Cl, `${K["length"]}`>, G, RGoals, A, DB> extends infer F
+          ? Step<
+              Freshen<Cl, `${K["length"]}`>,
+              G,
+              RGoals,
+              A,
+              DB,
+              Rest["length"]
+            > extends infer F
             ? F extends false
               ? Run<[[Goals, A, MoreCs], ...Rest], DB, Ans, [...K, 0]>
               : Run<[F, [Goals, A, MoreCs], ...Rest], DB, Ans, [...K, 0]>
