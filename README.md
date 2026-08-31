@@ -73,10 +73,12 @@ Trampoline findings, each verified by an isolated probe:
   depth linearly with term depth. The fix: a defunctionalized postorder
   rebuild (`RTerm` in src/machine.ts) with an explicit work stack, every step
   a tail call.
-- Fuel-chunked restart (yield a pause marker every 256 iterations, re-enter
-  from a wrapper loop) does NOT reset the budget: the ~5M global
-  instantiation-count cap grinds on regardless (probe: count-to-5000 chunked
-  loop, 7.4s then TS2589). That cap is the floor of the whole approach.
+- Fuel-chunked restart (yield a resumable state marker every 512 steps,
+  re-enter from a wrapper loop) DOES reset the ~1000 per-evaluation tail
+  cap - engine v3 runs 4-queens' ~4k steps on exactly this. What it cannot
+  reset is the ~5M global instantiation-count budget (probe:
+  count-to-5000 with a quadratically growing counter, 7.4s then TS2589),
+  so the true bound is total work, steps x state size.
 - `Equal` on two 30-deep cons chains trips the comparison stack guard
   (TS2321) even when the answer computed fine. Deep answers get unrolled to
   flat tuples (tail-recursive `UnL`) before comparison.
