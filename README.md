@@ -2,8 +2,10 @@
 
 ![check](https://github.com/hafley66/ts-prolog/actions/workflows/check.yml/badge.svg)
 
-Prolog basics smuggled into the TypeScript type system as literal types, targeting
-the TS 7 native (Go) compiler, where the same type-level programs just run faster.
+Prolog running inside the TypeScript type checker. Clause databases, unification,
+SLD resolution with backtracking, cut, negation-as-failure, dynamic assert/retract,
+findall, and arithmetic — all evaluated by `tsc --noEmit`. No codegen, no plugins,
+no runtime.
 
 ```ts
 import type { Query } from "ts-prolog";
@@ -18,141 +20,49 @@ type A = Query<"ancestor(A, ann)", Src>;
 //   ^? [["ancestor", "bob", "ann"], ["ancestor", "tom", "ann"]]
 ```
 
-Everything runs inside `tsc --noEmit`: parsing the clause strings, unification,
-SLD resolution with backtracking, cut, negation-as-failure. No codegen, no
-plugins, no runtime.
+Hover-friendly examples live in demos/playground.ts. `npm run check` (tsgo, 1.4s)
+and `npm run check:tsc` (3.0s) verify 12 test suites and 7 demo files.
 
 ## TOC
 
-- [Status](#status)
-- [Thesis](#thesis)
-- [The question](#the-question)
-- [Demos](#demos)
+- [What works](#what-works)
 - [Racing SWI-Prolog](#racing-swi-prolog)
-- [Implementation history](#implementation-history)
+- [Which TypeScript](#which-typescript)
+- [Demos: types that enforce rules](#demos-types-that-enforce-rules)
+- [Closing the loop: types that cause effects](#closing-the-loop-types-that-cause-effects)
+- [Engine internals](#engine-internals)
 - [Layout](#layout)
-- [Known limits to probe](#known-limits-to-probe)
 - [Non-goals](#non-goals)
 
-## Status
+## What works
 
-MVP works: unification, an ordered clause database, and SLD resolution with
-full backtracking run entirely in the type system, checked by both `tsgo`
-(7.0.0-dev.20260707.2) and `tsc` 7.0.2 with zero errors.
+Two input surfaces, one engine. Strings are sugar; the tuple encoding
+(`["parent", "tom", Var<"X">]`) is what the machine runs.
 
-| proven | test | evidence |
+| Prolog piece | how | status |
 | --- | --- | --- |
-| two-way unification, var-var aliasing, nested terms | tests/unify.test-d.ts | 9 assertions |
-| facts, rules, recursion, backward queries | tests/family.test-d.ts | `ancestor(A, ann)` enumerates `[bob, tom]` |
-| multiple answers in clause order | tests/append.test-d.ts | `append(A, B, [1,2])` yields all 3 splits |
-| relational arithmetic | tests/peano.test-d.ts | `add(A, B, 2)` yields all 3 pairs, `mul(2,2,4)` |
-
-`npm run check` (tsgo): 2.7s. `npm run check:tsc`: 1.5s. Same machine, all
-six suites including the n=40 deep append.
-
-## Recursion limits and the trampoline
-
-Three engines were built; each hit a different wall.
-
-| engine | shape | forward-append ceiling | wall |
-| --- | --- | --- | --- |
-| src/solve.ts naive | nested `Solve` in tuple spreads | n = 13 | TS2589, ~100 instantiation depth, non-tail nesting per step |
-| machine v1 (global subst) | tail-recursive choicepoint stack | n = 25 | subst values are lazy `infer` captures chained k deep; walking step k forces a k-deep tower |
-| src/machine.ts (rewriting) | tail loop + iterative postorder resolver | n = 60, 250+ flat inference steps | ~1000 tail iterations per evaluation, then the ~5M global instantiation-count budget |
-
-Trampoline findings, each verified by an isolated probe:
-
-- Tail-call elimination is real and survives nested conditionals,
-  `extends infer` chains, and frame destructuring: a bare loop runs 500+
-  iterations where non-tail recursion dies at ~100 depth.
-- The substitution must never store unforced projections. Binding
-  `infer`-captured tails builds a lazy tower that re-derives all history on
-  every walk. The fix: resolution by rewriting. Unify against an empty subst,
-  apply it to the remaining goals and answer immediately, discard it.
-- Deep structural recursion (`Resolve`, mapped types) burns instantiation
-  depth linearly with term depth. The fix: a defunctionalized postorder
-  rebuild (`RTerm` in src/machine.ts) with an explicit work stack, every step
-  a tail call.
-- Fuel-chunked restart (yield a resumable state marker every 512 steps,
-  re-enter from a wrapper loop) DOES reset the ~1000 per-evaluation tail
-  cap - engine v3 runs 4-queens' ~4k steps on exactly this. What it cannot
-  reset is the ~5M global instantiation-count budget (probe:
-  count-to-5000 with a quadratically growing counter, 7.4s then TS2589),
-  so the true bound is total work, steps x state size.
-- `Equal` on two 30-deep cons chains trips the comparison stack guard
-  (TS2321) even when the answer computed fine. Deep answers get unrolled to
-  flat tuples (tail-recursive `UnL`) before comparison.
-
-Verdict so far: `infer` alone is one-way matching, and that is enough. Real
-unification comes from threading a substitution type through elementwise
-conditional recursion (`src/unify.ts`). Backtracking needs no distribution
-trick: trying clauses in tuple order and concatenating the solution tuples of
-each branch (`src/solve.ts`) is exactly SLD search, with `[]` as failure.
-Standardize-apart falls out of template literal types: clause vars get a
-derivation-depth suffix.
-
-## Thesis
-
-Conditional types with `infer` perform one-way structural unification. Distributive
-conditional types fan a union across branches, which resembles trying multiple
-clauses. Recursion in type aliases gives resolution-style search. The experiment:
-push these until they either implement the actual Prolog execution model
-(unification, clause selection, backtracking) or hit a wall that names the missing
-feature.
-
-TS 7 matters because the Go port of tsc removes the practical ceiling: deep
-recursive type instantiation that made TS 5.x checkers crawl becomes cheap enough
-to treat the checker as an interpreter.
-
-## The question
-
-Is `infer`-based matching plus union distribution plus recursive aliases enough to
-express:
-
-| Prolog piece | TS encoding | status |
-| --- | --- | --- |
-| terms | string literals, `Var<N>` objects, tuples (src/term.ts) | done |
-| unification | subst threaded through recursive conditionals (src/unify.ts) | done, no occurs check |
-| variables / bindings | intersection-accumulated subst object, `Walk` deref | done |
-| clause database | ordered tuple of `[Head, ...Body]` tuples | done |
-| resolution / SLD search | `Solve` recursion over goal list (src/solve.ts) | done |
-| backtracking | per-clause solution tuples concatenated in order | done |
-| standardize-apart | template literal rename `X -> X.depth` | done |
-| occurs check | iterative worklist walk before every bind (src/unify.ts) | done |
-| cut | `"!"` -> `["$cut", N]` barrier, stack truncation (src/machine.ts) | done, machine only |
-| negation-as-failure, once, meta-call | library clauses: `not(G) :- G, !, fail. not(_).` — a var as a goal executes its binding | done via cut |
-| asserta / assertz / retract | frame-local clause DB; builtin goals rebuild it for the continuation | done, backtracking undoes changes (SWI asserts would survive) |
-| findall/3 | sub-derivation launched inside a machine step, solutions consed and unified | done, sees the frame-local DB |
-| arithmetic: plus/3, lt/2, neq/2 | native number literals, tuple-length math; plus is relational (any one arg unknown) | done, bounded ~1000 |
-| wildcards, number literals | parser: each `_` a fresh var, digit atoms become number types | done |
-| higher-order goals | var in functor position; `maplist` runs forwards and backwards | done via rewriting |
-| arithmetic beyond peano | intrinsic string/number types? | open |
-
-## Demos
-
-Six applications, pure TypeScript, no codegen or compiler plugins. The
-enforcement device is a phantom rest parameter typed `[never]` when the
-query has no solutions, so a violated rule is an ordinary type error at the
-call site; every negative case is pinned with `@ts-expect-error`.
-
-| demo | rule set | rejected at compile time |
-| --- | --- | --- |
-| demos/rbac.test-d.ts | grants + transitive role inheritance | `act("viewer", "delete")` |
-| demos/typestate.test-d.ts | state-transition facts + `run` over op lists | `exec(["open", "close", "read"])` |
-| demos/sql.test-d.ts | column facts, fk joinability; row types derived by query | `join("users", "users")` |
-| demos/di.test-d.ts | dependency lists + recursive `wired` | `resolve("worker")` (missing `queue`) |
-| demos/semver.test-d.ts | one shared logic var across goals = constraint solver | `install("v3")` |
-| demos/exhaustive.test-d.ts | derived handled-set compared against a union | `Exclude` names the missing `"keydown"` |
+| terms | string/number literals, `Var<N>`, tuples | done |
+| unification + occurs check | subst threaded through conditionals, worklist occurs walk | done |
+| clause DB, SLD search, backtracking | choicepoint-stack machine (src/machine.ts) | done |
+| cut | `"!"` -> stack-truncation barrier | done |
+| negation, once, meta-call | library clauses; a var as a goal executes its binding | done via cut |
+| asserta / assertz / retract | frame-local DB rebuilt per continuation | done; backtracking undoes changes (SWI asserts survive) |
+| findall/3 | sub-derivation inside a machine step | done, sees the dynamic DB |
+| arithmetic: plus/3, lt/2, neq/2 | native number literals, tuple-length math; plus is relational | done, values bounded ~1000 |
+| higher-order goals | var in functor position; `maplist` runs forwards AND backwards | done |
+| surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/parse.ts) |
+| prelude | `not/once/member/append/select/length` as `Prelude` | done (src/prelude.ts) |
+| setof | `Distinct<Answers>` post-pass | lite |
 
 ## Racing SWI-Prolog
 
-`bash bench/race.sh`: SWI-Prolog 10.0.2 solves each problem and writes its
-answers as JSONL; bench/gen_ts.py converts that JSONL into `Equal`
-assertions; tsgo must solve the same query and prove answer-for-answer,
-order-for-order agreement. A wrong or reordered answer fails the build.
-Results land in bench/results.jsonl.
+`npm run race`: SWI-Prolog 10.0.2 solves each problem and emits answers as
+JSONL; generated `Equal` assertions force tsgo to solve the same query and
+prove answer-for-answer, order-for-order agreement; a third lane extracts
+answers back out of the checker and diffs them against SWI. All 10 problems,
+all lanes: exact match.
 
-| problem | answers | swipl wall | tsgo wall | agree |
+| problem | answers | swipl | tsgo | agree |
 | --- | --- | --- | --- | --- |
 | append splits of an 8-list | 9 | 38ms | 486ms | yes |
 | ancestor over a 10-chain | 10 | 29ms | 436ms | yes |
@@ -165,111 +75,165 @@ Results land in bench/results.jsonl.
 | findall + peano count of kids per parent | 3 | 37ms | 435ms | yes |
 | 4-queens (native number arithmetic) | 2 | 32ms | 1774ms | yes |
 
-Startup baselines: swipl 67ms, npx+tsgo 1781ms cold / ~400ms warm. Wall
-clock is all process startup on both sides; net solve time is
-single-digit-to-tens of ms for both engines at these sizes. The difference
-is capacity: SWI runs these at n in the millions, the type checker runs out
-of fuel at n around 60 for deep terms and ~250 inference steps for flat
-ones.
+Wall clock is mostly process startup on both sides (swipl 67ms, npx+tsgo
+~400ms warm); net solve is tens of ms for both at these sizes. The real gap
+is capacity: SWI runs these at n in the millions, the checker runs out of
+fuel (see [engine internals](#engine-internals)).
 
-A third lane reads answers OUT of the type system with no candidate in
-hand. typescript@7 dropped the JS compiler API, but the native preview
-package ships an undocumented one: `tsgo --api` is a hidden subcommand,
-and `@typescript/native-preview/unstable/sync` exposes a client with
-`checker.getTypeAtLocation` + `typeToString`. tools/print-type-native.mjs
-opens the query file through it and prints the fully evaluated alias -
-the Go compiler itself answering the query. The printed tuple text is
-valid JSON; bench/compare.py normalizes it (uncons, unpeano) and diffs
-against SWI's JSONL. All problems: exact match, 160-1600ms per
-extraction, 2-6x faster than the retired ts5 lane
-(tools/print-type.mjs, kept for reference).
+<details>
+<summary>How the race verifies, and how answers get OUT of the type system</summary>
 
-## Implementation history
+Pipeline per problem, orchestrated by bench/race.sh:
 
-Three engines, each killed by a different limit of the checker's execution
-model. The commit log is the experiment record.
+1. `swipl -q -g main bench/progs/<p>.pl` prints one JSON line per answer.
+2. bench/gen_ts.py converts that JSONL into two files: a `.test-d.ts` with
+   an `Expect<Equal<Out, Want>>` assertion (tsgo must reproduce SWI's
+   answers exactly, order included), and a `.query.ts` with no expected
+   value at all.
+3. tools/print-type-native.mjs opens the `.query.ts` through the compiler
+   API, evaluates the `Out` alias, and prints it. Terms are literals and
+   tuples, so the printed type text is valid JSON.
+4. bench/compare.py normalizes (uncons lists, unpeano numerals) and diffs
+   against SWI's JSONL. Any mismatch exits nonzero; CI fails on any
+   unverified lane.
 
-| commit | engine | died at | lesson |
+Extraction rides an undocumented API: `tsgo --api` is a hidden subcommand,
+and `@typescript/native-preview/unstable/sync` ships a msgpack-RPC client
+whose `Project.checker` exposes `getTypeAtLocation` and `typeToString`
+(`NoTruncation`). That is the Go compiler itself answering the query,
+160-1600ms per problem, 2-6x faster than the retired typescript-5.9
+compiler-API lane (tools/print-type.mjs, kept for reference).
+
+</details>
+
+## Which TypeScript
+
+Two distributions of the same Go compiler are installed; they serve
+different roles here.
+
+| package | version | ships | used for |
 | --- | --- | --- | --- |
-| c2a62da | naive `Solve`: recursive conditionals, solution tuples concatenated by spread | forward append n = 13, TS2589 | spreads over recursive results are non-tail; ~100 instantiation depth is the wall |
-| f0e576a (v1, replaced in-place) | tail-recursive loop over a choicepoint stack, one global substitution | n = 25 | bindings stored as `infer` captures stay unforced; walking at step k forces a k-deep lazy tower |
-| f0e576a (v2) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | remaining caps: ~1000 tail iterations per evaluation, ~5M instantiation count per check run |
-| v3 (shipped) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; `RunLoop`/`RTerm` wrappers restart the per-evaluation tail budget; fresh names from chunk-x-fuel pairs, no growing counter | 4-queens passes (~4k steps); big states still die | step COUNT is now unbounded in practice; the binding constraint is total work, steps x state size, against the ~5M global instantiation budget |
+| `typescript` | 7.0.2 stable | `tsc` shim around the Go binary; no JS API (lib/ is 5 files) | `npm run check:tsc` |
+| `@typescript/native-preview` | 7.0.0-dev nightly | `tsgo` binary, hidden `--api` mode, `unstable/*` API exports | `npm run check`, answer extraction |
 
-Dead end proven along the way: fuel-chunked re-entry (pause marker every 256
-iterations, outer loop resumes) does not reset the ~5M global budget, so
-there is no fourth engine inside the checker. Escaping that budget means
-leaving the checker (see tyvm), which forfeits the whole point of running in
-`tsc --noEmit`.
+The compiler API lives only in the nightly channel for now (the export path
+is literally named `unstable`). When it graduates to stable v7, extraction
+should work against `typescript` proper by swapping one import.
 
-## Surface syntax
+## Demos: types that enforce rules
 
-The lexer verdict above still buys real Prolog source, parsed at the type
-level (src/parse.ts): a recursive-descent parser over template literal
-holes turns clause strings into the tuple encoding.
+The enforcement device is a phantom rest parameter that becomes `[never]`
+when a query has no solutions: a violated rule is an ordinary type error at
+the call site. Every negative case is pinned with `@ts-expect-error`.
 
-```ts
-type Src = [
-  "parent(tom, bob)",
-  "ancestor(X, Y) :- parent(X, Y)",
-  "ancestor(X, Z) :- parent(X, Y), ancestor(Y, Z)",
-];
-type A = Query<"ancestor(A, bob)", Src>; // [["ancestor", "tom", "bob"]]
-```
+| demo | rule set | rejected at compile time |
+| --- | --- | --- |
+| demos/rbac.test-d.ts | grants + transitive role inheritance | `act("viewer", "delete")` |
+| demos/typestate.test-d.ts | state-transition facts over op lists | `exec(["open", "close", "read"])` |
+| demos/sql.test-d.ts | column facts, fk joinability; row types derived by query | `join("users", "users")` |
+| demos/di.test-d.ts | dependency lists + recursive `wired` | `resolve("worker")` (missing `queue`) |
+| demos/semver.test-d.ts | shared logic var across goals = constraint solver | `install("v3")` |
+| demos/exhaustive.test-d.ts | derived handled-set vs a union | `Exclude` names the missing `"keydown"` |
 
-Vars are initial-uppercase or underscore, cut is `!`, and the whole family
-and NAF suites pass written this way (tests/parse.test-d.ts).
-
-## Closing the loop
+## Closing the loop: types that cause effects
 
 `node loop/run.mjs`: the checker plans, a runner acts, results become facts.
 
 ```mermaid
 flowchart LR
   DB["loop/done.ts: facts"] --> TC["checker: ready(X) derived by SLD"]
-  TC --> EX["print-type.mjs: answers as JSON"]
+  TC --> EX["print-type-native.mjs: answers as JSON"]
   EX --> RUN["run.mjs: executes the effect"]
   RUN --> DB
 ```
 
-Each cycle re-queries `ready(A)` over edge/done facts (NAF keeps finished
-steps out), executes the first answer's effect, appends `done(step)` to the
+Each cycle re-queries `ready(A)` over edge/done facts (NAF excludes finished
+steps), executes the first answer's effect, appends `done(step)` to the
 generated facts file, and repeats to fixpoint. Effects are proof-gated: a
-program that fails to typecheck runs nothing. Every cycle starts from a
-small fact set, so the fuel budget covers one delta, never the history.
+program that fails to typecheck runs nothing. Each cycle re-queries a small
+delta, never the history.
+
+## Engine internals
+
+Four engines were built; each earlier one died against a different limit of
+the checker's execution model. Everything below is verified by probes whose
+commands live in the git history.
+
+<details>
+<summary>Engine history: the four walls, and the trampoline that works</summary>
+
+| commit | engine | died at | lesson |
+| --- | --- | --- | --- |
+| c2a62da | naive `Solve`: recursive conditionals, solution tuples concatenated by spread | forward append n = 13, TS2589 | spreads over recursive results are non-tail; ~100 instantiation depth is the wall |
+| f0e576a (v1) | tail-recursive loop over a choicepoint stack, one global substitution | n = 25 | bindings stored as `infer` captures stay unforced; walking at step k forces a k-deep lazy tower |
+| f0e576a (v2) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | ~1000 tail iterations per evaluation caps step count |
+| 5f2636c (v3, shipped) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; wrapper loops restart the tail budget; fresh names from chunk-x-fuel pairs | 4-queens' ~4k steps pass; big states still die | binding constraint is total work, steps x state size, vs the ~5M global instantiation budget |
+
+Findings, each isolated by its own probe:
+
+- Tail-call elimination is real and survives nested conditionals,
+  `extends infer` chains, and frame destructuring. Non-tail recursion dies
+  at ~100 depth; tail loops run ~1000 iterations per evaluation.
+- The substitution must never store unforced projections. Binding
+  `infer`-captured tails builds a lazy tower that re-derives all history on
+  every walk. Fix: unify against an empty subst, apply it to the remaining
+  goals and answer immediately, discard it.
+- Deep structural recursion burns instantiation depth linearly with term
+  depth. Fix: defunctionalized postorder rebuild (`RTerm`) with an explicit
+  work stack, every step a tail call.
+- Fuel-chunked restart DOES reset the per-evaluation tail cap (v3 runs on
+  it). What nothing resets is the ~5M global instantiation-count budget, so
+  the true bound is total work. Escaping that means leaving the checker,
+  which forfeits running inside `tsc --noEmit`.
+- `Equal` on two 30-deep cons chains trips the comparison stack guard
+  (TS2321) even when the answer computed fine; deep answers get unrolled to
+  flat tuples before comparison.
+- Template literal inference is a lexer, not a second unification engine:
+  each hole matches leftmost-shortest with literal anchoring, no cross-hole
+  constraints, no backtracking. The parser in src/parse.ts is built on
+  exactly that.
+
+</details>
+
+<details>
+<summary>Measured limits and reserved names</summary>
+
+- Forward append ceiling n = 60 under v2 semantics; v3 removes the step
+  cap but total work (steps x state size) still meets the ~5M budget, so
+  large states die grinding (TS2589 after seconds instead of instantly).
+- Two variable-free cons chains unify to depth 80, die by 120:
+  `UnifyArgs` descends non-tail per element pair.
+- Left recursion burns fuel and dies as TS2589 after ~6s: the checker
+  cannot hang forever; nontermination degrades to a compile error.
+- Arithmetic values are tuple-length bounded, ~1000.
+- Reserved functors: `$cut`, `asserta`, `assertz`, `retract`, `findall`,
+  `plus`, `lt`, `neq`. Cut in a query (rather than a clause body) is not
+  transformed.
+- `retract` is deterministic (first match, no re-satisfaction on
+  backtracking); SWI's retract re-satisfies. Asserts are undone by
+  backtracking here, and survive it in SWI.
+- Unbound vars collected by `findall` keep sub-derivation-scoped names,
+  loosely matching `copy_term` semantics.
+
+</details>
 
 ## Layout
 
 | path | holds |
 | --- | --- |
+| src/index.ts | public API: `Query`, `QueryM`, `Unify`, `Var`, `Prelude`, `Distinct` |
 | src/term.ts | `Var`, `Term`, `Subst`, `Walk`, `Bind` |
 | src/unify.ts | `Unify` (subst or `false`), occurs check |
-| src/parse.ts | type-level Prolog source parser: `Clause`, `Program`, `Query` |
-| src/solve.ts | naive `Solve`/`Query`, `Freshen`, `Resolve` (kept as the readable reference) |
-| src/machine.ts | trampolined `Run`/`QueryM`: tail-recursive SLD loop, iterative resolver |
-| tests/*.test-d.ts | `Expect<Equal<...>>` assertions, checked at compile time |
-
-## Measured limits
-
-- Forward append ceiling n = 60 (unchanged after adding the occurs check),
-  ~250 flat inference steps, ~5M instantiation count per check run.
-- Two variable-free cons chains unify up to depth 80, die by 120:
-  `UnifyArgs` descends non-tail per element pair.
-- Left recursion (`anc(X,Z) :- anc(X,Y), ...` listed first) burns fuel and
-  dies as TS2589 after ~6s. The checker cannot hang forever; nontermination
-  degrades to an error, unlike real Prolog.
-- Cut in the query itself is not transformed (only clause bodies);
-  `["$cut", N]`, `asserta`, `assertz`, and `retract` are reserved functors.
-- `retract` is deterministic (first match, no retry on backtracking) and
-  matches clause heads; SWI's retract re-satisfies on backtracking.
-- Template literal inference answered: each hole matches leftmost-shortest
-  with literal anchoring, no cross-hole constraint solving, no backtracking.
-  A lexer, and not a second unification engine. Probes: `"abbc"` vs
-  `` `${X}b${Y}` `` gives `X="a"` with no backtracking to reconcile a later
-  literal.
+| src/parse.ts | type-level Prolog source parser |
+| src/machine.ts | the v3 engine: chunked SLD loop, builtins, iterative resolver |
+| src/solve.ts | naive engine, kept as the readable reference |
+| tests/, demos/ | compile-time assertions; demos/playground.ts for hovering |
+| bench/ | SWI race: programs, generator, comparator, results.jsonl |
+| loop/ | the effect fixpoint loop |
+| tools/ | answer extraction via the tsgo API (native) and ts5 (reference) |
 
 ## Non-goals
 
-Rendering Doom in types. The target is the Prolog model and its algorithms, in
-readable encodings, with each success or failure documented against the exact
-compiler behavior that caused it.
+Rendering Doom in types. The target is the Prolog model and its algorithms,
+in readable encodings, with each success or failure documented against the
+exact compiler behavior that caused it.
