@@ -30,6 +30,14 @@ def normalize(problem, answer):
         return {"x": answer[2]}
     if problem == "peano":
         return {"a": unpeano(answer[1]), "b": unpeano(answer[2])}
+    if problem == "hanoi":
+        return {"moves": [[m[1], m[2]] for m in uncons(answer[5])]}
+    if problem == "perm":
+        return {"p": uncons(answer[2])}
+    if problem == "color":
+        return {"c": answer[1:7]}
+    if problem == "nrev":
+        return {"r": uncons(answer[2])}
     raise ValueError(problem)
 
 

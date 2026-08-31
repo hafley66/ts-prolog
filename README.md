@@ -126,11 +126,15 @@ assertions; tsgo must solve the same query and prove answer-for-answer,
 order-for-order agreement. A wrong or reordered answer fails the build.
 Results land in bench/results.jsonl.
 
-| problem | answers | swipl wall | tsgo wall | net solve (minus startup) | agree |
-| --- | --- | --- | --- | --- | --- |
-| append splits of an 8-list | 9 | 138ms | 1824ms | ~70ms vs ~40ms | yes |
-| ancestor over a 10-chain | 10 | 38ms | 1444ms | ~0ms vs ~0ms | yes |
-| peano pairs summing to 6 | 7 | 99ms | 1281ms | ~30ms vs ~0ms | yes |
+| problem | answers | swipl wall | tsgo wall | agree |
+| --- | --- | --- | --- | --- |
+| append splits of an 8-list | 9 | 38ms | 486ms | yes |
+| ancestor over a 10-chain | 10 | 29ms | 436ms | yes |
+| peano pairs summing to 6 | 7 | 28ms | 340ms | yes |
+| towers of hanoi, 3 disks | 1 (7 moves) | 31ms | 378ms | yes |
+| permutations of a 4-list | 24 | 31ms | 1351ms | yes |
+| 3-coloring Australia (6 regions) | 6 | 31ms | 548ms | yes |
+| naive reverse of a 6-list | 1 | 31ms | 364ms | yes |
 
 Startup baselines: swipl 67ms, npx+tsgo 1781ms cold / ~400ms warm. Wall
 clock is all process startup on both sides; net solve time is
