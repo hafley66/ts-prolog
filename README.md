@@ -8,6 +8,7 @@ the TS 7 native (Go) compiler, where the same type-level programs just run faste
 - [Status](#status)
 - [Thesis](#thesis)
 - [The question](#the-question)
+- [Demos](#demos)
 - [Layout](#layout)
 - [Known limits to probe](#known-limits-to-probe)
 - [Non-goals](#non-goals)
@@ -97,6 +98,22 @@ express:
 | occurs check, cyclic terms | none known | open |
 | cut, negation-as-failure | `never` propagation tricks | open |
 | arithmetic beyond peano | intrinsic string/number types? | open |
+
+## Demos
+
+Six applications, pure TypeScript, no codegen or compiler plugins. The
+enforcement device is a phantom rest parameter typed `[never]` when the
+query has no solutions, so a violated rule is an ordinary type error at the
+call site; every negative case is pinned with `@ts-expect-error`.
+
+| demo | rule set | rejected at compile time |
+| --- | --- | --- |
+| demos/rbac.test-d.ts | grants + transitive role inheritance | `act("viewer", "delete")` |
+| demos/typestate.test-d.ts | state-transition facts + `run` over op lists | `exec(["open", "close", "read"])` |
+| demos/sql.test-d.ts | column facts, fk joinability; row types derived by query | `join("users", "users")` |
+| demos/di.test-d.ts | dependency lists + recursive `wired` | `resolve("worker")` (missing `queue`) |
+| demos/semver.test-d.ts | one shared logic var across goals = constraint solver | `install("v3")` |
+| demos/exhaustive.test-d.ts | derived handled-set compared against a union | `Exclude` names the missing `"keydown"` |
 
 ## Layout
 
