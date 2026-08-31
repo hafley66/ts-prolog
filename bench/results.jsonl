@@ -1,6 +1,9 @@
-{"problem":"splits","engine":"swipl","ms":138}
-{"problem":"chain","engine":"swipl","ms":38}
-{"problem":"peano","engine":"swipl","ms":99}
-{"problem":"splits","engine":"tsgo","ms":1824,"verified":true}
-{"problem":"chain","engine":"tsgo","ms":1444,"verified":true}
-{"problem":"peano","engine":"tsgo","ms":1281,"verified":true}
+{"problem":"splits","engine":"swipl","ms":74}
+{"problem":"chain","engine":"swipl","ms":29}
+{"problem":"peano","engine":"swipl","ms":30}
+{"problem":"splits","engine":"tsgo","ms":424,"verified":true}
+{"problem":"chain","engine":"tsgo","ms":434,"verified":true}
+{"problem":"peano","engine":"tsgo","ms":360,"verified":true}
+{"problem":"splits","engine":"ts5-extract","ms":409,"verified":true}
+{"problem":"chain","engine":"ts5-extract","ms":560,"verified":true}
+{"problem":"peano","engine":"ts5-extract","ms":374,"verified":true}

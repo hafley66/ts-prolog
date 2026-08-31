@@ -26,3 +26,13 @@ for p in "${problems[@]}"; do
   echo "$p tsgo ${tsgo_ms}ms verified=$([ $ok -eq 0 ] && echo true || echo false)"
   echo "{\"problem\":\"$p\",\"engine\":\"tsgo\",\"ms\":$tsgo_ms,\"verified\":$([ $ok -eq 0 ] && echo true || echo false)}" >> bench/results.jsonl
 done
+
+for p in "${problems[@]}"; do
+  s=$(ms)
+  node tools/print-type.mjs "bench/generated/$p.query.ts" Out > "bench/out/$p.ts5.json"
+  ts5_ms=$(( $(ms) - s ))
+  ok=0
+  python3 bench/compare.py "$p" || ok=$?
+  echo "$p ts5-extract ${ts5_ms}ms verified=$([ $ok -eq 0 ] && echo true || echo false)"
+  echo "{\"problem\":\"$p\",\"engine\":\"ts5-extract\",\"ms\":$ts5_ms,\"verified\":$([ $ok -eq 0 ] && echo true || echo false)}" >> bench/results.jsonl
+done

@@ -85,4 +85,27 @@ expected = ",\n  ".join(
     + "type _match = Expect<Equal<Out, Want>>;\n"
 )
 
-print("generated:", *(p.name for p in sorted(GEN.glob("*.test-d.ts"))))
+QUERIES = {
+    "splits": (APPEND_DB, f'["append", Var<"A">, Var<"B">, {cons(full)}]'),
+    "chain": (
+        "type DB = [\n"
+        + facts
+        + '  [["anc", Var<"X">, Var<"Y">], ["par", Var<"X">, Var<"Y">]],\n'
+        + '  [["anc", Var<"X">, Var<"Z">], ["par", Var<"X">, Var<"Y">], ["anc", Var<"Y">, Var<"Z">]],\n'
+        + "];\n",
+        '["anc", "n0", Var<"X">]',
+    ),
+    "peano": (
+        "type DB = [\n"
+        + '  [["add", "z", Var<"Y">, Var<"Y">]],\n'
+        + '  [["add", ["s", Var<"X">], Var<"Y">, ["s", Var<"Z">]], ["add", Var<"X">, Var<"Y">, Var<"Z">]],\n'
+        + "];\n",
+        f'["add", Var<"A">, Var<"B">, {peano(6)}]',
+    ),
+}
+for name, (db, goal) in QUERIES.items():
+    (GEN / f"{name}.query.ts").write_text(
+        HEADER + db + f"export type Out = QueryM<{goal}, DB>;\n"
+    )
+
+print("generated:", *(p.name for p in sorted(GEN.glob("*.ts"))))

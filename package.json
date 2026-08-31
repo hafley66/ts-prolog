@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "ts5": "npm:typescript@^5.9.3",
     "typescript": "^7.0.2"
   }
 }

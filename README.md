@@ -130,11 +130,21 @@ Results land in bench/results.jsonl.
 | ancestor over a 10-chain | 10 | 38ms | 1444ms | ~0ms vs ~0ms | yes |
 | peano pairs summing to 6 | 7 | 99ms | 1281ms | ~30ms vs ~0ms | yes |
 
-Startup baselines: swipl 67ms, npx+tsgo 1781ms. Wall clock is all process
-startup on both sides; net solve time is single-digit-to-tens of ms for both
-engines at these sizes. The difference is capacity: SWI runs these at n in
-the millions, the type checker runs out of fuel at n around 60 for deep
-terms and ~250 inference steps for flat ones.
+Startup baselines: swipl 67ms, npx+tsgo 1781ms cold / ~400ms warm. Wall
+clock is all process startup on both sides; net solve time is
+single-digit-to-tens of ms for both engines at these sizes. The difference
+is capacity: SWI runs these at n in the millions, the type checker runs out
+of fuel at n around 60 for deep terms and ~250 inference steps for flat
+ones.
+
+A third lane reads answers OUT of the type system with no candidate in
+hand: typescript@7 dropped the JS compiler API (its lib/ is a shim around
+the Go binary), so tools/print-type.mjs runs the 5.9 checker API
+(`getTypeAtLocation` + `typeToString` with `NoTruncation`) over a
+query-only file and prints the fully evaluated alias. The printed tuple
+text is valid JSON; bench/compare.py normalizes it (uncons, unpeano) and
+diffs against SWI's JSONL. All three problems: exact match, ~400-560ms per
+extraction.
 
 ## Layout
 
