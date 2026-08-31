@@ -25,8 +25,39 @@ full backtracking run entirely in the type system, checked by both `tsgo`
 | multiple answers in clause order | tests/append.test-d.ts | `append(A, B, [1,2])` yields all 3 splits |
 | relational arithmetic | tests/peano.test-d.ts | `add(A, B, 2)` yields all 3 pairs, `mul(2,2,4)` |
 
-`npm run check` (tsgo): 0.24s. `npm run check:tsc`: 0.69s. Same machine, all
-four suites.
+`npm run check` (tsgo): 2.7s. `npm run check:tsc`: 1.5s. Same machine, all
+six suites including the n=40 deep append.
+
+## Recursion limits and the trampoline
+
+Three engines were built; each hit a different wall.
+
+| engine | shape | forward-append ceiling | wall |
+| --- | --- | --- | --- |
+| src/solve.ts naive | nested `Solve` in tuple spreads | n = 13 | TS2589, ~100 instantiation depth, non-tail nesting per step |
+| machine v1 (global subst) | tail-recursive choicepoint stack | n = 25 | subst values are lazy `infer` captures chained k deep; walking step k forces a k-deep tower |
+| src/machine.ts (rewriting) | tail loop + iterative postorder resolver | n = 60, 250+ flat inference steps | ~1000 tail iterations per evaluation, then the ~5M global instantiation-count budget |
+
+Trampoline findings, each verified by an isolated probe:
+
+- Tail-call elimination is real and survives nested conditionals,
+  `extends infer` chains, and frame destructuring: a bare loop runs 500+
+  iterations where non-tail recursion dies at ~100 depth.
+- The substitution must never store unforced projections. Binding
+  `infer`-captured tails builds a lazy tower that re-derives all history on
+  every walk. The fix: resolution by rewriting. Unify against an empty subst,
+  apply it to the remaining goals and answer immediately, discard it.
+- Deep structural recursion (`Resolve`, mapped types) burns instantiation
+  depth linearly with term depth. The fix: a defunctionalized postorder
+  rebuild (`RTerm` in src/machine.ts) with an explicit work stack, every step
+  a tail call.
+- Fuel-chunked restart (yield a pause marker every 256 iterations, re-enter
+  from a wrapper loop) does NOT reset the budget: the ~5M global
+  instantiation-count cap grinds on regardless (probe: count-to-5000 chunked
+  loop, 7.4s then TS2589). That cap is the floor of the whole approach.
+- `Equal` on two 30-deep cons chains trips the comparison stack guard
+  (TS2321) even when the answer computed fine. Deep answers get unrolled to
+  flat tuples (tail-recursive `UnL`) before comparison.
 
 Verdict so far: `infer` alone is one-way matching, and that is enough. Real
 unification comes from threading a substitution type through elementwise
@@ -73,7 +104,8 @@ express:
 | --- | --- |
 | src/term.ts | `Var`, `Term`, `Subst`, `Walk`, `Bind` |
 | src/unify.ts | `Unify` (subst or `false`) |
-| src/solve.ts | `Freshen`, `Solve`, `Resolve`, `Query` |
+| src/solve.ts | naive `Solve`/`Query`, `Freshen`, `Resolve` (kept as the readable reference) |
+| src/machine.ts | trampolined `Run`/`QueryM`: tail-recursive SLD loop, iterative resolver |
 | tests/*.test-d.ts | `Expect<Equal<...>>` assertions, checked at compile time |
 
 ## Known limits to probe

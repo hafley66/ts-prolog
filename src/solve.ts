@@ -2,7 +2,7 @@ import type { Var, Subst, Walk } from "./term";
 import type { Unify } from "./unify";
 
 // standardize apart: clause vars get a per-derivation-depth suffix
-type Freshen<T, D extends string> = T extends Var<infer N>
+export type Freshen<T, D extends string> = T extends Var<infer N>
   ? Var<`${N}.${D}`>
   : T extends readonly unknown[]
     ? { [K in keyof T]: Freshen<T[K], D> }
@@ -60,6 +60,6 @@ export type Query<G, DB extends readonly unknown[]> = ResolveAll<
   Solve<[G], {}, DB, []>
 >;
 
-type ResolveAll<G, Sols> = {
+export type ResolveAll<G, Sols> = {
   [K in keyof Sols]: Sols[K] extends Subst ? Resolve<G, Sols[K]> : never;
 };
