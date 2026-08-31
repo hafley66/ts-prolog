@@ -32,8 +32,8 @@ type UnifyW<A, B, S extends Subst> = A extends Var<infer N>
     : BindChecked<N, B, S>
   : B extends Var<infer N>
     ? BindChecked<N, A, S>
-    : A extends string
-      ? B extends string
+    : A extends string | number
+      ? B extends string | number
         ? SameAtom<A, B, S>
         : false
       : A extends readonly unknown[]

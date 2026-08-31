@@ -44,7 +44,7 @@ function saveDone(done) {
 }
 
 function ready() {
-  const out = run("node", [join(HERE, "..", "tools", "print-type.mjs"), join(HERE, "program.ts"), "Out"]);
+  const out = run("node", [join(HERE, "..", "tools", "print-type-native.mjs"), join(HERE, "program.ts"), "Out"]);
   return JSON.parse(out).map((answer) => answer[1]);
 }
 

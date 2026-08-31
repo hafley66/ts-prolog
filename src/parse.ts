@@ -15,12 +15,32 @@ type ReadName<S extends string, Acc extends string = ""> = S extends
     : ReadName<R, `${Acc}${C}`>
   : [Acc, S];
 
-// prolog convention: initial uppercase or underscore is a variable
+// prolog convention: initial uppercase or underscore is a variable;
+// all-digit names become native number literals
 type MkAtomOrVar<N extends string> = N extends `${infer C}${string}`
   ? C extends UpperAlpha | "_"
     ? Var<N>
-    : N
+    : N extends `${infer Num extends number}`
+      ? Num
+      : N
   : N;
+
+// each bare "_" becomes a distinct clause-scoped var; -> [term, counter]
+type RenameWild<T, C extends readonly 0[]> = T extends Var<"_">
+  ? [Var<`_${C["length"]}`>, [...C, 0]]
+  : T extends readonly unknown[]
+    ? RenameWildList<T, C, []>
+    : [T, C];
+
+type RenameWildList<
+  Ts extends readonly unknown[],
+  C extends readonly 0[],
+  Acc extends readonly unknown[],
+> = Ts extends readonly [infer H, ...infer R]
+  ? RenameWild<H, C> extends [infer H2, infer C2 extends readonly 0[]]
+    ? RenameWildList<R, C2, [...Acc, H2]>
+    : never
+  : [Acc, C];
 
 // parse one term; -> [Term, rest]. Functor "(" must follow the name directly.
 type PTerm<S extends string> = Trim<S> extends `[${infer R}`
@@ -70,15 +90,17 @@ type PBody<S extends string> = PTerm<S> extends [infer T, infer R extends string
     : [T]
   : never;
 
-export type Clause<S extends string> = S extends `${infer H} :- ${infer B}`
+type RawClause<S extends string> = S extends `${infer H} :- ${infer B}`
   ? [PTerm<H>[0], ...PBody<B>]
   : [PTerm<S>[0]];
+
+export type Clause<S extends string> = RenameWild<RawClause<S>, []>[0];
 
 export type Program<Cs extends readonly string[]> = {
   [K in keyof Cs]: Clause<Cs[K]>;
 };
 
-export type Term<S extends string> = PTerm<S>[0];
+export type Term<S extends string> = RenameWild<PTerm<S>[0], []>[0];
 
 export type Query<S extends string, Cs extends readonly string[]> = QueryM<
   Term<S>,

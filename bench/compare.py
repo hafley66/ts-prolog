@@ -40,6 +40,8 @@ def normalize(problem, answer):
         return {"who": answer[1]}
     if problem == "collect":
         return {"p": answer[1], "kids": uncons(answer[2]), "n": unpeano(answer[3])}
+    if problem == "queens":
+        return {"q": uncons(answer[1])}
     if problem == "nrev":
         return {"r": uncons(answer[2])}
     raise ValueError(problem)
@@ -48,6 +50,9 @@ def normalize(problem, answer):
 problem = sys.argv[1]
 extracted = json.loads((ROOT / "out" / f"{problem}.ts5.json").read_text())
 got = [normalize(problem, a) for a in extracted]
+if problem == "queens":
+    for w in [json.loads(l) for l in (ROOT / "out" / "queens.jsonl").read_text().splitlines() if l]:
+        w["q"] = [int(x) for x in w["q"]]
 want = [
     json.loads(l)
     for l in (ROOT / "out" / f"{problem}.jsonl").read_text().splitlines()

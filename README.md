@@ -1,5 +1,7 @@
 # ts-prolog
 
+![check](https://github.com/hafley66/ts-prolog/actions/workflows/check.yml/badge.svg)
+
 Prolog basics smuggled into the TypeScript type system as literal types, targeting
 the TS 7 native (Go) compiler, where the same type-level programs just run faster.
 
@@ -119,6 +121,9 @@ express:
 | negation-as-failure, once, meta-call | library clauses: `not(G) :- G, !, fail. not(_).` — a var as a goal executes its binding | done via cut |
 | asserta / assertz / retract | frame-local clause DB; builtin goals rebuild it for the continuation | done, backtracking undoes changes (SWI asserts would survive) |
 | findall/3 | sub-derivation launched inside a machine step, solutions consed and unified | done, sees the frame-local DB |
+| arithmetic: plus/3, lt/2, neq/2 | native number literals, tuple-length math; plus is relational (any one arg unknown) | done, bounded ~1000 |
+| wildcards, number literals | parser: each `_` a fresh var, digit atoms become number types | done |
+| higher-order goals | var in functor position; `maplist` runs forwards and backwards | done via rewriting |
 | arithmetic beyond peano | intrinsic string/number types? | open |
 
 ## Demos
@@ -156,6 +161,7 @@ Results land in bench/results.jsonl.
 | naive reverse of a 6-list | 1 | 31ms | 364ms | yes |
 | mini-zebra, 3 houses (who owns the fish) | 1 | 32ms | 484ms | yes |
 | findall + peano count of kids per parent | 3 | 37ms | 435ms | yes |
+| 4-queens (native number arithmetic) | 2 | 32ms | 1774ms | yes |
 
 Startup baselines: swipl 67ms, npx+tsgo 1781ms cold / ~400ms warm. Wall
 clock is all process startup on both sides; net solve time is
@@ -165,13 +171,16 @@ of fuel at n around 60 for deep terms and ~250 inference steps for flat
 ones.
 
 A third lane reads answers OUT of the type system with no candidate in
-hand: typescript@7 dropped the JS compiler API (its lib/ is a shim around
-the Go binary), so tools/print-type.mjs runs the 5.9 checker API
-(`getTypeAtLocation` + `typeToString` with `NoTruncation`) over a
-query-only file and prints the fully evaluated alias. The printed tuple
-text is valid JSON; bench/compare.py normalizes it (uncons, unpeano) and
-diffs against SWI's JSONL. All three problems: exact match, ~400-560ms per
-extraction.
+hand. typescript@7 dropped the JS compiler API, but the native preview
+package ships an undocumented one: `tsgo --api` is a hidden subcommand,
+and `@typescript/native-preview/unstable/sync` exposes a client with
+`checker.getTypeAtLocation` + `typeToString`. tools/print-type-native.mjs
+opens the query file through it and prints the fully evaluated alias -
+the Go compiler itself answering the query. The printed tuple text is
+valid JSON; bench/compare.py normalizes it (uncons, unpeano) and diffs
+against SWI's JSONL. All problems: exact match, 160-1600ms per
+extraction, 2-6x faster than the retired ts5 lane
+(tools/print-type.mjs, kept for reference).
 
 ## Implementation history
 
@@ -182,7 +191,8 @@ model. The commit log is the experiment record.
 | --- | --- | --- | --- |
 | c2a62da | naive `Solve`: recursive conditionals, solution tuples concatenated by spread | forward append n = 13, TS2589 | spreads over recursive results are non-tail; ~100 instantiation depth is the wall |
 | f0e576a (v1, replaced in-place) | tail-recursive loop over a choicepoint stack, one global substitution | n = 25 | bindings stored as `infer` captures stay unforced; walking at step k forces a k-deep lazy tower |
-| f0e576a (v2, shipped) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | remaining caps: ~1000 tail iterations per evaluation, ~5M instantiation count per check run |
+| f0e576a (v2) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | remaining caps: ~1000 tail iterations per evaluation, ~5M instantiation count per check run |
+| v3 (shipped) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; `RunLoop`/`RTerm` wrappers restart the per-evaluation tail budget; fresh names from chunk-x-fuel pairs, no growing counter | 4-queens passes (~4k steps); big states still die | step COUNT is now unbounded in practice; the binding constraint is total work, steps x state size, against the ~5M global instantiation budget |
 
 Dead end proven along the way: fuel-chunked re-entry (pause marker every 256
 iterations, outer loop resumes) does not reset the ~5M global budget, so

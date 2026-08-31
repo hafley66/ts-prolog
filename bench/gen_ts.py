@@ -169,6 +169,30 @@ PROBLEMS = {
         '["row", Var<"P">, Var<"L">, Var<"N">]',
         lambda r: f'["row", "{r["p"]}", {cons(r["kids"])}, {peano(r["n"])}]',
     ),
+    "queens": (
+        clauses(
+            '[["sel", Var<"X">, ["cons", Var<"X">, Var<"T">], Var<"T">]]',
+            '[["sel", Var<"X">, ["cons", Var<"H">, Var<"T">], ["cons", Var<"H">, Var<"R">]], ["sel", Var<"X">, Var<"T">, Var<"R">]]',
+            '[["ok", Var<"Q0">, "nil", Var<"D0">]]',
+            '[\n    ["ok", Var<"Q">, ["cons", Var<"P">, Var<"Ps">], Var<"D">],\n'
+            '    ["plus", Var<"P">, Var<"D">, Var<"S1">],\n'
+            '    ["neq", Var<"S1">, Var<"Q">],\n'
+            '    ["plus", Var<"Q">, Var<"D">, Var<"S2">],\n'
+            '    ["neq", Var<"S2">, Var<"P">],\n'
+            '    ["plus", Var<"D">, 1, Var<"D2">],\n'
+            '    ["ok", Var<"Q">, Var<"Ps">, Var<"D2">],\n  ]',
+            '[["place", "nil", Var<"Acc">, Var<"Acc">]]',
+            '[\n    ["place", Var<"L">, Var<"Acc">, Var<"Qs">],\n'
+            '    ["sel", Var<"Q">, Var<"L">, Var<"R">],\n'
+            '    ["ok", Var<"Q">, Var<"Acc">, 1],\n'
+            '    ["place", Var<"R">, ["cons", Var<"Q">, Var<"Acc">], Var<"Qs">],\n  ]',
+            '[["queens", Var<"Qs">], ["place", '
+            + cons_raw(["1", "2", "3", "4"])
+            + ', "nil", Var<"Qs">]]',
+        ),
+        '["queens", Var<"Qs">]',
+        lambda r: f'["queens", {cons_raw([str(int(x)) for x in r["q"]])}]',
+    ),
     "nrev": (
         clauses(
             *APP,

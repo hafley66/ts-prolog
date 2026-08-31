@@ -18,5 +18,19 @@
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "ts5": "npm:typescript@^5.9.3",
     "typescript": "^7.0.2"
+  },
+  "description": "Prolog (unification, SLD resolution, cut, findall, dynamic DB) running inside the TypeScript type checker",
+  "license": "MIT",
+  "keywords": [
+    "prolog",
+    "type-level",
+    "typescript",
+    "logic-programming",
+    "sld-resolution",
+    "tsgo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hafley66/ts-prolog"
   }
 }
