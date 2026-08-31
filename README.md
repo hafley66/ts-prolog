@@ -10,6 +10,7 @@ the TS 7 native (Go) compiler, where the same type-level programs just run faste
 - [The question](#the-question)
 - [Demos](#demos)
 - [Racing SWI-Prolog](#racing-swi-prolog)
+- [Implementation history](#implementation-history)
 - [Layout](#layout)
 - [Known limits to probe](#known-limits-to-probe)
 - [Non-goals](#non-goals)
@@ -145,6 +146,23 @@ query-only file and prints the fully evaluated alias. The printed tuple
 text is valid JSON; bench/compare.py normalizes it (uncons, unpeano) and
 diffs against SWI's JSONL. All three problems: exact match, ~400-560ms per
 extraction.
+
+## Implementation history
+
+Three engines, each killed by a different limit of the checker's execution
+model. The commit log is the experiment record.
+
+| commit | engine | died at | lesson |
+| --- | --- | --- | --- |
+| c2a62da | naive `Solve`: recursive conditionals, solution tuples concatenated by spread | forward append n = 13, TS2589 | spreads over recursive results are non-tail; ~100 instantiation depth is the wall |
+| f0e576a (v1, replaced in-place) | tail-recursive loop over a choicepoint stack, one global substitution | n = 25 | bindings stored as `infer` captures stay unforced; walking at step k forces a k-deep lazy tower |
+| f0e576a (v2, shipped) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | remaining caps: ~1000 tail iterations per evaluation, ~5M instantiation count per check run |
+
+Dead end proven along the way: fuel-chunked re-entry (pause marker every 256
+iterations, outer loop resumes) does not reset the ~5M global budget, so
+there is no fourth engine inside the checker. Escaping that budget means
+leaving the checker (see tyvm), which forfeits the whole point of running in
+`tsc --noEmit`.
 
 ## Layout
 
