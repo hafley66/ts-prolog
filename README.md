@@ -117,6 +117,7 @@ express:
 | occurs check | iterative worklist walk before every bind (src/unify.ts) | done |
 | cut | `"!"` -> `["$cut", N]` barrier, stack truncation (src/machine.ts) | done, machine only |
 | negation-as-failure, once, meta-call | library clauses: `not(G) :- G, !, fail. not(_).` — a var as a goal executes its binding | done via cut |
+| asserta / assertz / retract | frame-local clause DB; builtin goals rebuild it for the continuation | done, backtracking undoes changes (SWI asserts would survive) |
 | arithmetic beyond peano | intrinsic string/number types? | open |
 
 ## Demos
@@ -226,7 +227,9 @@ and NAF suites pass written this way (tests/parse.test-d.ts).
   dies as TS2589 after ~6s. The checker cannot hang forever; nontermination
   degrades to an error, unlike real Prolog.
 - Cut in the query itself is not transformed (only clause bodies);
-  `["$cut", N]` is reserved.
+  `["$cut", N]`, `asserta`, `assertz`, and `retract` are reserved functors.
+- `retract` is deterministic (first match, no retry on backtracking) and
+  matches clause heads; SWI's retract re-satisfies on backtracking.
 - Template literal inference answered: each hole matches leftmost-shortest
   with literal anchoring, no cross-hole constraint solving, no backtracking.
   A lexer, and not a second unification engine. Probes: `"abbc"` vs

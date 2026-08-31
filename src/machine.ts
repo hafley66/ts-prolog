@@ -56,49 +56,102 @@ type Step<
           infer Goals2 extends readonly unknown[],
           infer A2,
         ]
-        ? [Goals2, A2, DB]
+        ? [Goals2, A2, DB, DB]
         : never
       : false
     : never
   : false;
 
-// frame = [Goals, AnswerTerm, RemainingClauses]; CPs is the backtrack stack
+// deterministic retract: remove the first clause whose head unifies,
+// apply the head bindings to the continuation
+type Retract<
+  T,
+  Cs,
+  Before extends readonly unknown[],
+  RGoals extends readonly unknown[],
+  A,
+  D extends string,
+> = Cs extends readonly [
+  infer C extends readonly unknown[],
+  ...infer More extends readonly unknown[],
+]
+  ? C extends readonly [infer H, ...unknown[]]
+    ? Unify<T, Freshen<H, D>, {}> extends infer S2
+      ? S2 extends Subst
+        ? RTerm<[RGoals, A], [], [], S2> extends [
+            infer G2 extends readonly unknown[],
+            infer A2,
+          ]
+          ? [G2, A2, [...Before, ...More], [...Before, ...More]]
+          : never
+        : Retract<T, More, [...Before, C], RGoals, A, D>
+      : never
+    : Retract<T, More, [...Before, C], RGoals, A, D>
+  : false;
+
+// frame = [Goals, AnswerTerm, RemainingClauses, FrameDB]; frame-local DB
+// means backtracking undoes assert/retract (SWI asserts would survive)
 export type Run<
   CPs extends readonly unknown[],
-  DB extends readonly unknown[],
   Ans extends readonly unknown[],
   K extends readonly unknown[],
 > = CPs extends readonly [infer Top, ...infer Rest extends readonly unknown[]]
-  ? Top extends readonly [infer Goals extends readonly unknown[], infer A, infer Cs]
+  ? Top extends readonly [
+      infer Goals extends readonly unknown[],
+      infer A,
+      infer Cs,
+      infer FDB extends readonly unknown[],
+    ]
     ? Goals extends readonly []
-      ? Run<Rest, DB, [...Ans, A], K>
+      ? Run<Rest, [...Ans, A], K>
       : Goals extends readonly [
             ["$cut", infer N extends number],
             ...infer RGoals extends readonly unknown[],
           ]
-        ? Run<[[RGoals, A, DB], ...Trunc<Rest, N>], DB, Ans, K>
-        : Cs extends readonly [infer Cl, ...infer MoreCs]
-        ? Goals extends readonly [infer G, ...infer RGoals extends readonly unknown[]]
-          ? Step<
-              Freshen<Cl, `${K["length"]}`>,
-              G,
-              RGoals,
-              A,
-              DB,
-              Rest["length"]
-            > extends infer F
-            ? F extends false
-              ? Run<[[Goals, A, MoreCs], ...Rest], DB, Ans, [...K, 0]>
-              : Run<[F, [Goals, A, MoreCs], ...Rest], DB, Ans, [...K, 0]>
-            : never
-          : never
-        : Run<Rest, DB, Ans, K>
+        ? Run<[[RGoals, A, FDB, FDB], ...Trunc<Rest, N>], Ans, K>
+        : Goals extends readonly [
+              ["asserta", infer T],
+              ...infer RGoals extends readonly unknown[],
+            ]
+          ? Run<[[RGoals, A, [[T], ...FDB], [[T], ...FDB]], ...Rest], Ans, K>
+          : Goals extends readonly [
+                ["assertz", infer T],
+                ...infer RGoals extends readonly unknown[],
+              ]
+            ? Run<[[RGoals, A, [...FDB, [T]], [...FDB, [T]]], ...Rest], Ans, K>
+            : Goals extends readonly [
+                  ["retract", infer T],
+                  ...infer RGoals extends readonly unknown[],
+                ]
+              ? Retract<T, FDB, [], RGoals, A, `${K["length"]}`> extends infer F
+                ? F extends false
+                  ? Run<Rest, Ans, K>
+                  : Run<[F, ...Rest], Ans, [...K, 0]>
+                : never
+              : Cs extends readonly [infer Cl, ...infer MoreCs]
+                ? Goals extends readonly [
+                      infer G,
+                      ...infer RGoals extends readonly unknown[],
+                    ]
+                  ? Step<
+                      Freshen<Cl, `${K["length"]}`>,
+                      G,
+                      RGoals,
+                      A,
+                      FDB,
+                      Rest["length"]
+                    > extends infer F
+                    ? F extends false
+                      ? Run<[[Goals, A, MoreCs, FDB], ...Rest], Ans, [...K, 0]>
+                      : Run<[F, [Goals, A, MoreCs, FDB], ...Rest], Ans, [...K, 0]>
+                    : never
+                  : never
+                : Run<Rest, Ans, K>
     : never
   : Ans;
 
 export type QueryM<G, DB extends readonly unknown[]> = Run<
-  [[[G], G, DB]],
-  DB,
+  [[[G], G, DB, DB]],
   [],
   []
 >;
