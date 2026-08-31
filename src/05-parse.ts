@@ -1,5 +1,5 @@
-import type { Var } from "./term";
-import type { QueryM } from "./machine";
+import type { Var } from "./01-term";
+import type { QueryM } from "./04-machine";
 
 type UpperAlpha =
   | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"

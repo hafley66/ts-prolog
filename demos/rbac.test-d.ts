@@ -1,5 +1,5 @@
-import type { Var } from "../src/term";
-import type { QueryM } from "../src/machine";
+import type { Var } from "../src/01-term";
+import type { QueryM } from "../src/04-machine";
 
 type R = Var<"R">;
 type R2 = Var<"R2">;

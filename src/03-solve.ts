@@ -1,5 +1,5 @@
-import type { Var, Subst, Walk } from "./term";
-import type { Unify } from "./unify";
+import type { Var, Subst, Walk } from "./01-term";
+import type { Unify } from "./02-unify";
 
 // standardize apart: clause vars get a per-derivation-depth suffix
 export type Freshen<T, D extends string> = T extends Var<infer N>

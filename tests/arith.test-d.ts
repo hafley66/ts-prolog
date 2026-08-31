@@ -1,7 +1,7 @@
-import type { Var } from "../src/term";
-import type { QueryM } from "../src/machine";
-import type { Query, Term } from "../src/parse";
-import type { Prelude } from "../src/prelude";
+import type { Var } from "../src/01-term";
+import type { QueryM } from "../src/04-machine";
+import type { Query, Term } from "../src/05-parse";
+import type { Prelude } from "../src/06-prelude";
 import type { Equal, Expect } from "./util";
 
 type Src = [...Prelude, "birthday(A, B) :- plus(A, 1, B)"];

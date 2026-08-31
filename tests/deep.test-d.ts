@@ -1,5 +1,5 @@
-import type { Var } from "../src/term";
-import type { QueryM } from "../src/machine";
+import type { Var } from "../src/01-term";
+import type { QueryM } from "../src/04-machine";
 import type { Equal, Expect } from "./util";
 
 type L<T extends readonly unknown[]> = T extends readonly [infer H, ...infer R]

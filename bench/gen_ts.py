@@ -9,8 +9,8 @@ GEN = ROOT / "generated"
 GEN.mkdir(exist_ok=True)
 
 HEADER = (
-    'import type { Var } from "../../src/term";\n'
-    'import type { QueryM } from "../../src/machine";\n'
+    'import type { Var } from "../../src/01-term";\n'
+    'import type { QueryM } from "../../src/04-machine";\n'
     'import type { Equal, Expect } from "../../tests/util";\n\n'
 )
 

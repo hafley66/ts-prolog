@@ -1,4 +1,4 @@
-import type { Query } from "../src/parse";
+import type { Query } from "../src/05-parse";
 import type { Done } from "./done";
 
 type Rules = [

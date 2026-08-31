@@ -43,15 +43,15 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 | --- | --- | --- |
 | terms | string/number literals, `Var<N>`, tuples | done |
 | unification + occurs check | subst threaded through conditionals, worklist occurs walk | done |
-| clause DB, SLD search, backtracking | choicepoint-stack machine (src/machine.ts) | done |
+| clause DB, SLD search, backtracking | choicepoint-stack machine (src/04-machine.ts) | done |
 | cut | `"!"` -> stack-truncation barrier | done |
 | negation, once, meta-call | library clauses; a var as a goal executes its binding | done via cut |
 | asserta / assertz / retract | frame-local DB rebuilt per continuation | done; backtracking undoes changes (SWI asserts survive) |
 | findall/3 | sub-derivation inside a machine step | done, sees the dynamic DB |
 | arithmetic: plus/3, lt/2, neq/2 | native number literals, tuple-length math; plus is relational | done, values bounded ~1000 |
 | higher-order goals | var in functor position; `maplist` runs forwards AND backwards | done |
-| surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/parse.ts) |
-| prelude | `not/once/member/append/select/length` as `Prelude` | done (src/prelude.ts) |
+| surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/05-parse.ts) |
+| prelude | `not/once/member/append/select/length` as `Prelude` | done (src/06-prelude.ts) |
 | setof | `Distinct<Answers>` post-pass | lite |
 
 ## Racing SWI-Prolog
@@ -190,7 +190,7 @@ Findings, each isolated by its own probe:
   flat tuples before comparison.
 - Template literal inference is a lexer, not a second unification engine:
   each hole matches leftmost-shortest with literal anchoring, no cross-hole
-  constraints, no backtracking. The parser in src/parse.ts is built on
+  constraints, no backtracking. The parser in src/05-parse.ts is built on
   exactly that.
 
 </details>
@@ -222,11 +222,11 @@ Findings, each isolated by its own probe:
 | path | holds |
 | --- | --- |
 | src/index.ts | public API: `Query`, `QueryM`, `Unify`, `Var`, `Prelude`, `Distinct` |
-| src/term.ts | `Var`, `Term`, `Subst`, `Walk`, `Bind` |
-| src/unify.ts | `Unify` (subst or `false`), occurs check |
-| src/parse.ts | type-level Prolog source parser |
-| src/machine.ts | the v3 engine: chunked SLD loop, builtins, iterative resolver |
-| src/solve.ts | naive engine, kept as the readable reference |
+| src/01-term.ts | `Var`, `Term`, `Subst`, `Walk`, `Bind` |
+| src/02-unify.ts | `Unify` (subst or `false`), occurs check |
+| src/05-parse.ts | type-level Prolog source parser |
+| src/04-machine.ts | the v3 engine: chunked SLD loop, builtins, iterative resolver |
+| src/03-solve.ts | naive engine, kept as the readable reference |
 | tests/, demos/ | compile-time assertions; demos/playground.ts for hovering |
 | bench/ | SWI race: programs, generator, comparator, results.jsonl |
 | loop/ | the effect fixpoint loop |

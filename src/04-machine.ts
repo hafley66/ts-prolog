@@ -1,6 +1,6 @@
-import type { Subst, Walk } from "./term";
-import type { Unify } from "./unify";
-import type { Freshen } from "./solve";
+import type { Subst, Walk } from "./01-term";
+import type { Unify } from "./02-unify";
+import type { Freshen } from "./03-solve";
 
 // iterative deep-substitute: postorder rebuild with an explicit stack,
 // every recursive use is a tail call; fuel-chunked like Run

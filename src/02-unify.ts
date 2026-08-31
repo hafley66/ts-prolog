@@ -1,4 +1,4 @@
-import type { Var, Subst, Walk, Bind } from "./term";
+import type { Var, Subst, Walk, Bind } from "./01-term";
 
 // Subst on success, false on clash. No occurs check.
 export type Unify<A, B, S extends Subst> = UnifyW<Walk<A, S>, Walk<B, S>, S>;

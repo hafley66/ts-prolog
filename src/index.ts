@@ -1,8 +1,8 @@
-export type { Var, Subst } from "./term";
-export type { Unify } from "./unify";
-export type { QueryM, Run } from "./machine";
-export type { Query, Clause, Program, Term as Parse } from "./parse";
-export type { Prelude } from "./prelude";
+export type { Var, Subst } from "./01-term";
+export type { Unify } from "./02-unify";
+export type { QueryM, Run } from "./04-machine";
+export type { Query, Clause, Program, Term as Parse } from "./05-parse";
+export type { Prelude } from "./06-prelude";
 
 type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B
   ? 1

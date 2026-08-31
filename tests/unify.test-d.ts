@@ -1,6 +1,6 @@
-import type { Var, Subst } from "../src/term";
-import type { Unify } from "../src/unify";
-import type { Resolve } from "../src/solve";
+import type { Var, Subst } from "../src/01-term";
+import type { Unify } from "../src/02-unify";
+import type { Resolve } from "../src/03-solve";
 import type { Equal, Expect } from "./util";
 
 type R<T, S> = Resolve<T, Extract<S, Subst>>;

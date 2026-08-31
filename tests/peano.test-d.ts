@@ -1,5 +1,5 @@
-import type { Var } from "../src/term";
-import type { Query } from "../src/solve";
+import type { Var } from "../src/01-term";
+import type { Query } from "../src/03-solve";
 import type { Equal, Expect } from "./util";
 
 // peano numerals: "z" / ["s", N]

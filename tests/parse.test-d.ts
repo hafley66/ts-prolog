@@ -1,5 +1,5 @@
-import type { Var } from "../src/term";
-import type { Clause, Term, Query } from "../src/parse";
+import type { Var } from "../src/01-term";
+import type { Clause, Term, Query } from "../src/05-parse";
 import type { Equal, Expect } from "./util";
 
 type _atom = Expect<Equal<Term<"tom">, "tom">>;

@@ -1,6 +1,6 @@
 // hover any alias to watch the checker solve it
-import type { Query } from "../src/parse";
-import type { Prelude } from "../src/prelude";
+import type { Query } from "../src/05-parse";
+import type { Prelude } from "../src/06-prelude";
 
 type Family = [
   ...Prelude,

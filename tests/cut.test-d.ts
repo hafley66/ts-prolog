@@ -1,6 +1,6 @@
-import type { Var } from "../src/term";
-import type { QueryM } from "../src/machine";
-import type { Unify } from "../src/unify";
+import type { Var } from "../src/01-term";
+import type { QueryM } from "../src/04-machine";
+import type { Unify } from "../src/02-unify";
 import type { Equal, Expect } from "./util";
 
 type X = Var<"X">;
