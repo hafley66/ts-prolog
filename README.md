@@ -169,12 +169,31 @@ there is no fourth engine inside the checker. Escaping that budget means
 leaving the checker (see tyvm), which forfeits the whole point of running in
 `tsc --noEmit`.
 
+## Surface syntax
+
+The lexer verdict above still buys real Prolog source, parsed at the type
+level (src/parse.ts): a recursive-descent parser over template literal
+holes turns clause strings into the tuple encoding.
+
+```ts
+type Src = [
+  "parent(tom, bob)",
+  "ancestor(X, Y) :- parent(X, Y)",
+  "ancestor(X, Z) :- parent(X, Y), ancestor(Y, Z)",
+];
+type A = Query<"ancestor(A, bob)", Src>; // [["ancestor", "tom", "bob"]]
+```
+
+Vars are initial-uppercase or underscore, cut is `!`, and the whole family
+and NAF suites pass written this way (tests/parse.test-d.ts).
+
 ## Layout
 
 | path | holds |
 | --- | --- |
 | src/term.ts | `Var`, `Term`, `Subst`, `Walk`, `Bind` |
-| src/unify.ts | `Unify` (subst or `false`) |
+| src/unify.ts | `Unify` (subst or `false`), occurs check |
+| src/parse.ts | type-level Prolog source parser: `Clause`, `Program`, `Query` |
 | src/solve.ts | naive `Solve`/`Query`, `Freshen`, `Resolve` (kept as the readable reference) |
 | src/machine.ts | trampolined `Run`/`QueryM`: tail-recursive SLD loop, iterative resolver |
 | tests/*.test-d.ts | `Expect<Equal<...>>` assertions, checked at compile time |
@@ -190,8 +209,11 @@ leaving the checker (see tyvm), which forfeits the whole point of running in
   degrades to an error, unlike real Prolog.
 - Cut in the query itself is not transformed (only clause bodies);
   `["$cut", N]` is reserved.
-- Open: whether template literal inference (multiple `infer` holes in one
-  string) is a second unification engine with different power.
+- Template literal inference answered: each hole matches leftmost-shortest
+  with literal anchoring, no cross-hole constraint solving, no backtracking.
+  A lexer, and not a second unification engine. Probes: `"abbc"` vs
+  `` `${X}b${Y}` `` gives `X="a"` with no backtracking to reconcile a later
+  literal.
 
 ## Non-goals
 
