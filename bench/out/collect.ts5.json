@@ -1,0 +1,1 @@
+[["row", "tom", ["cons", "bob", ["cons", "liz", ["cons", "ann", "nil"]]], ["s", ["s", ["s", "z"]]]], ["row", "bob", ["cons", "pat", "nil"], ["s", "z"]], ["row", "liz", "nil", "z"]]

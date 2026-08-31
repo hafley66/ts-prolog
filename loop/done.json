@@ -1,0 +1,6 @@
+[
+  "fetch",
+  "build",
+  "test",
+  "deploy"
+]

@@ -1,0 +1,3 @@
+{"p":"tom","kids":["bob","liz","ann"],"n":3}
+{"p":"bob","kids":["pat"],"n":1}
+{"p":"liz","kids":[],"n":0}

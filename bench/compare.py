@@ -38,6 +38,8 @@ def normalize(problem, answer):
         return {"c": answer[1:7]}
     if problem == "puzzle":
         return {"who": answer[1]}
+    if problem == "collect":
+        return {"p": answer[1], "kids": uncons(answer[2]), "n": unpeano(answer[3])}
     if problem == "nrev":
         return {"r": uncons(answer[2])}
     raise ValueError(problem)

@@ -118,6 +118,7 @@ express:
 | cut | `"!"` -> `["$cut", N]` barrier, stack truncation (src/machine.ts) | done, machine only |
 | negation-as-failure, once, meta-call | library clauses: `not(G) :- G, !, fail. not(_).` — a var as a goal executes its binding | done via cut |
 | asserta / assertz / retract | frame-local clause DB; builtin goals rebuild it for the continuation | done, backtracking undoes changes (SWI asserts would survive) |
+| findall/3 | sub-derivation launched inside a machine step, solutions consed and unified | done, sees the frame-local DB |
 | arithmetic beyond peano | intrinsic string/number types? | open |
 
 ## Demos
@@ -154,6 +155,7 @@ Results land in bench/results.jsonl.
 | 3-coloring Australia (6 regions) | 6 | 31ms | 548ms | yes |
 | naive reverse of a 6-list | 1 | 31ms | 364ms | yes |
 | mini-zebra, 3 houses (who owns the fish) | 1 | 32ms | 484ms | yes |
+| findall + peano count of kids per parent | 3 | 37ms | 435ms | yes |
 
 Startup baselines: swipl 67ms, npx+tsgo 1781ms cold / ~400ms warm. Wall
 clock is all process startup on both sides; net solve time is
@@ -205,6 +207,24 @@ type A = Query<"ancestor(A, bob)", Src>; // [["ancestor", "tom", "bob"]]
 
 Vars are initial-uppercase or underscore, cut is `!`, and the whole family
 and NAF suites pass written this way (tests/parse.test-d.ts).
+
+## Closing the loop
+
+`node loop/run.mjs`: the checker plans, a runner acts, results become facts.
+
+```mermaid
+flowchart LR
+  DB["loop/done.ts: facts"] --> TC["checker: ready(X) derived by SLD"]
+  TC --> EX["print-type.mjs: answers as JSON"]
+  EX --> RUN["run.mjs: executes the effect"]
+  RUN --> DB
+```
+
+Each cycle re-queries `ready(A)` over edge/done facts (NAF keeps finished
+steps out), executes the first answer's effect, appends `done(step)` to the
+generated facts file, and repeats to fixpoint. Effects are proof-gated: a
+program that fails to typecheck runs nothing. Every cycle starts from a
+small fact set, so the fuel budget covers one delta, never the history.
 
 ## Layout
 

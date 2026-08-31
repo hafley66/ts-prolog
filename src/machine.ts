@@ -89,6 +89,31 @@ type Retract<
     : Retract<T, More, [...Before, C], RGoals, A, D>
   : false;
 
+type ToCons<Xs extends readonly unknown[]> = Xs extends readonly [
+  infer H,
+  ...infer R,
+]
+  ? ["cons", H, ToCons<R>]
+  : "nil";
+
+// unify the collected solutions with R, then substitute into the continuation
+type FindallBind<
+  Sols extends readonly unknown[],
+  R,
+  RGoals extends readonly unknown[],
+  A,
+  FDB extends readonly unknown[],
+> = Unify<R, ToCons<Sols>, {}> extends infer S2
+  ? S2 extends Subst
+    ? RTerm<[RGoals, A], [], [], S2> extends [
+        infer G2 extends readonly unknown[],
+        infer A2,
+      ]
+      ? [G2, A2, FDB, FDB]
+      : never
+    : false
+  : never;
+
 // frame = [Goals, AnswerTerm, RemainingClauses, FrameDB]; frame-local DB
 // means backtracking undoes assert/retract (SWI asserts would survive)
 export type Run<
@@ -119,6 +144,18 @@ export type Run<
                 ...infer RGoals extends readonly unknown[],
               ]
             ? Run<[[RGoals, A, [...FDB, [T]], [...FDB, [T]]], ...Rest], Ans, K>
+            : Goals extends readonly [
+                  ["findall", infer T, infer G, infer R],
+                  ...infer RGoals extends readonly unknown[],
+                ]
+              ? Run<[[[G], T, FDB, FDB]], [], [...K, 0]> extends infer Sols extends
+                  readonly unknown[]
+                ? FindallBind<Sols, R, RGoals, A, FDB> extends infer F
+                  ? F extends false
+                    ? Run<Rest, Ans, K>
+                    : Run<[F, ...Rest], Ans, [...K, 0]>
+                  : never
+                : never
             : Goals extends readonly [
                   ["retract", infer T],
                   ...infer RGoals extends readonly unknown[],

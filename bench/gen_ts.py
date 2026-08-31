@@ -150,6 +150,25 @@ PROBLEMS = {
         '["puzzle", Var<"Who">]',
         lambda r: f'["puzzle", "{r["who"]}"]',
     ),
+    "collect": (
+        clauses(
+            '[["par", "tom", "bob"]]',
+            '[["par", "tom", "liz"]]',
+            '[["par", "tom", "ann"]]',
+            '[["par", "bob", "pat"]]',
+            '[["plen", "nil", "z"]]',
+            '[["plen", ["cons", Var<"H">, Var<"T">], ["s", Var<"N">]], ["plen", Var<"T">, Var<"N">]]',
+            '[["who", "tom"]]',
+            '[["who", "bob"]]',
+            '[["who", "liz"]]',
+            '[\n    ["kids", Var<"P">, Var<"L">, Var<"N">],\n'
+            '    ["findall", Var<"X">, ["par", Var<"P">, Var<"X">], Var<"L">],\n'
+            '    ["plen", Var<"L">, Var<"N">],\n  ]',
+            '[["row", Var<"P">, Var<"L">, Var<"N">], ["who", Var<"P">], ["kids", Var<"P">, Var<"L">, Var<"N">]]',
+        ),
+        '["row", Var<"P">, Var<"L">, Var<"N">]',
+        lambda r: f'["row", "{r["p"]}", {cons(r["kids"])}, {peano(r["n"])}]',
+    ),
     "nrev": (
         clauses(
             *APP,
