@@ -75,8 +75,8 @@ all lanes: exact match.
 | naive reverse of a 6-list | 1 | 38ms | 460ms | yes |
 | mini-zebra, 3 houses (who owns the fish) | 1 | 33ms | 626ms | yes |
 | findall + peano count of kids per parent | 3 | 37ms | 437ms | yes |
-| 4-queens (native number arithmetic) | 2 | 35ms | 1676ms | yes |
-| pythagorean triples, legs to 13 (between + times) | 4 | 37ms | 2136ms | yes |
+| 5-queens (native number arithmetic) | 10 | 31ms | 3962ms | yes |
+| pythagorean triples, legs to 13 (between + times) | 4 | 30ms | 1771ms | yes |
 
 Wall clock is mostly process startup on both sides (swipl 67ms, npx+tsgo
 ~400ms warm); net solve is tens of ms for both at these sizes. The real gap
@@ -126,11 +126,11 @@ walls.
 | unification nesting depth `f(f(...))` | 95 | 96 | TS2589 | Unify recurses per nesting level, not fuel-chunked |
 | parser nesting depth `f(f(...))` | 91 | 92 | TS2589 | same shape in the template-literal parser |
 | parser flat arity `f(a, ..., a)` | 500+ | - | - | flat scans are tail-recursive, no wall found |
-| flat conjunction goal count | 304 | 305 | TS2589 | per-step goal-list rewrite, work = steps x state |
-| naive reverse list length | 30 | 31 | TS2589 | O(n^2) steps on a growing term |
-| ancestor chain length | 38 | 39 | TS2589 | answer tuple + goal list both grow with n |
-| n-queens | 4 | 5 | TS2589 | search volume x state size |
-| 5-house zebra clue count | 4 of 14 | 5 | TS2589 | dies in ~4s / 1.3GB; full puzzle needs ~3x the work budget |
+| flat conjunction goal count | 303 | 304 | TS2589 | per-step goal-list rewrite, work = steps x state; indexing's per-goal bucket scan cost one unit here (was 304) |
+| naive reverse list length | 32 | 33 | TS2589 | O(n^2) steps on a growing term (was 30 pre-indexing) |
+| ancestor chain length | 48 | 49 | TS2589 | answer tuple + goal list both grow with n (was 38 pre-indexing) |
+| n-queens | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
+| 5-house zebra clue count | 5 of 14 | 6 | TS2589 | dies in ~4s / 1.3GB; the wall is mem/right search volume x the 35-node houses term, and indexing bought exactly one clue (was 4) |
 
 Peak checker RSS scales with the grind: passing runs near a wall hit 3-4GB
 (flat n=304: 3.6GB; nrev n=30: 3.5GB). One engine bug fell out of the
@@ -199,7 +199,8 @@ commands live in the git history.
 | c2a62da | naive `Solve`: recursive conditionals, solution tuples concatenated by spread | forward append n = 13, TS2589 | spreads over recursive results are non-tail; ~100 instantiation depth is the wall |
 | f0e576a (v1) | tail-recursive loop over a choicepoint stack, one global substitution | n = 25 | bindings stored as `infer` captures stay unforced; walking at step k forces a k-deep lazy tower |
 | f0e576a (v2) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | ~1000 tail iterations per evaluation caps step count |
-| 5f2636c (v3, shipped) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; wrapper loops restart the tail budget; fresh names from chunk-x-fuel pairs | 4-queens' ~4k steps pass; big states still die | binding constraint is total work, steps x state size, vs the ~5M global instantiation budget |
+| 5f2636c (v3) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; wrapper loops restart the tail budget; fresh names from chunk-x-fuel pairs | 4-queens' ~4k steps pass; big states still die | binding constraint is total work, steps x state size, vs the ~5M global instantiation budget |
+| v4 (shipped) | v3 + first-argument indexing: a frame's clause slot starts as a `"?"` marker, resolved on first dispatch to the goal-functor's bucket (`Candidates`/`Bucket`), folded into the same step | 5-queens passes, 6 dies; full zebra still out (5 of 14 clues) | failed clause trials cost a deep `Freshen` each; filtering by functor first bought 10-26% on search problems, and an early two-step version showed one extra machine step per goal costs more than a small DB scan |
 
 Findings, each isolated by its own probe:
 
@@ -239,8 +240,9 @@ Findings, each isolated by its own probe:
   cannot hang forever; nontermination degrades to a compile error.
 - Arithmetic values are tuple-length bounded, ~1000.
 - Reserved functors: `$cut`, `asserta`, `assertz`, `retract`, `findall`,
-  `plus`, `lt`, `neq`. Cut in a query (rather than a clause body) is not
-  transformed.
+  `plus`, `times`, `between`, `lt`, `neq`. Cut in a query (rather than a
+  clause body) is not transformed. `"?"` is reserved as the frame marker
+  for an unresolved clause bucket.
 - `retract` is deterministic (first match, no re-satisfaction on
   backtracking); SWI's retract re-satisfies. Asserts are undone by
   backtracking here, and survive it in SWI.

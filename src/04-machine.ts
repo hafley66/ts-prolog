@@ -1,4 +1,4 @@
-import type { Subst, Walk } from "./01-term";
+import type { Subst, Var, Walk } from "./01-term";
 import type { Unify } from "./02-unify";
 import type { Freshen } from "./03-solve";
 
@@ -43,6 +43,30 @@ type RTerm<
     : R
   : never;
 
+// first-argument indexing: a goal trials only clauses sharing its functor.
+// Nonstandard shapes (var functor, var head) stay candidates for Unify
+type Functor<G> = G extends readonly [infer F0, ...unknown[]] ? F0 : G;
+
+type Bucket<
+  F0,
+  Cs extends readonly unknown[],
+  Acc extends readonly unknown[],
+> = Cs extends readonly [infer Cl, ...infer More extends readonly unknown[]]
+  ? Cl extends readonly [readonly [infer HF, ...unknown[]], ...unknown[]]
+    ? [HF] extends [F0]
+      ? Bucket<F0, More, [...Acc, Cl]>
+      : HF extends Var<string>
+        ? Bucket<F0, More, [...Acc, Cl]>
+        : Bucket<F0, More, Acc>
+    : Bucket<F0, More, [...Acc, Cl]>
+  : Acc;
+
+type Candidates<G, FDB extends readonly unknown[]> = Functor<G> extends infer F0
+  ? F0 extends string | number
+    ? Bucket<F0, FDB, []>
+    : FDB
+  : never;
+
 // "!" in a clause body becomes ["$cut", N]: N = stack depth below this
 // goal's alternatives, the barrier to truncate back to
 type Arm<Body, N extends number> = {
@@ -74,7 +98,7 @@ type Step<
           infer Goals2 extends readonly unknown[],
           infer A2,
         ]
-        ? [Goals2, A2, DB, DB]
+        ? [Goals2, A2, "?", DB]
         : never
       : false
     : never
@@ -100,7 +124,7 @@ type Retract<
             infer G2 extends readonly unknown[],
             infer A2,
           ]
-          ? [G2, A2, [...Before, ...More], [...Before, ...More]]
+          ? [G2, A2, "?", [...Before, ...More]]
           : never
         : Retract<T, More, [...Before, C], RGoals, A, D>
       : never
@@ -169,7 +193,7 @@ type ArithBind<
           infer G2 extends readonly unknown[],
           infer A2,
         ]
-        ? [G2, A2, FDB, FDB]
+        ? [G2, A2, "?", FDB]
         : never
       : false
     : never
@@ -233,7 +257,8 @@ type FindallBind<
     : false
   : never;
 
-// frame = [Goals, AnswerTerm, RemainingClauses, FrameDB]; frame-local DB
+// frame = [Goals, AnswerTerm, RemainingClauses | "?", FrameDB]; "?" = bucket
+// not yet selected, resolved to Candidates on first dispatch; frame-local DB
 // means backtracking undoes assert/retract (SWI asserts would survive)
 // Fuel F pauses every 512 steps ({p, a} marker); RunLoop restarts the
 // checker's per-evaluation tail budget with a fresh chunk
@@ -258,17 +283,17 @@ export type Run<
             ["$cut", infer N extends number],
             ...infer RGoals extends readonly unknown[],
           ]
-        ? Run<[[RGoals, A, FDB, FDB], ...Trunc<Rest, N>], Ans, P, C, [...F, 0]>
+        ? Run<[[RGoals, A, "?", FDB], ...Trunc<Rest, N>], Ans, P, C, [...F, 0]>
         : Goals extends readonly [
               ["asserta", infer T],
               ...infer RGoals extends readonly unknown[],
             ]
-          ? Run<[[RGoals, A, [[T], ...FDB], [[T], ...FDB]], ...Rest], Ans, P, C, [...F, 0]>
+          ? Run<[[RGoals, A, "?", [[T], ...FDB]], ...Rest], Ans, P, C, [...F, 0]>
           : Goals extends readonly [
                 ["assertz", infer T],
                 ...infer RGoals extends readonly unknown[],
               ]
-            ? Run<[[RGoals, A, [...FDB, [T]], [...FDB, [T]]], ...Rest], Ans, P, C, [...F, 0]>
+            ? Run<[[RGoals, A, "?", [...FDB, [T]]], ...Rest], Ans, P, C, [...F, 0]>
             : Goals extends readonly [
                   ["plus", infer X, infer Y, infer Z],
                   ...infer RGoals extends readonly unknown[],
@@ -283,7 +308,7 @@ export type Run<
                   ...infer RGoals extends readonly unknown[],
                 ]
               ? Rep<Y> extends [...Rep<X>, unknown, ...unknown[]]
-                ? Run<[[RGoals, A, FDB, FDB], ...Rest], Ans, P, C, [...F, 0]>
+                ? Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
                 : Run<Rest, Ans, P, C, [...F, 0]>
             : Goals extends readonly [
                   ["neq", infer X extends string | number, infer Y extends string | number],
@@ -292,8 +317,8 @@ export type Run<
               ? X extends Y
                 ? Y extends X
                   ? Run<Rest, Ans, P, C, [...F, 0]>
-                  : Run<[[RGoals, A, FDB, FDB], ...Rest], Ans, P, C, [...F, 0]>
-                : Run<[[RGoals, A, FDB, FDB], ...Rest], Ans, P, C, [...F, 0]>
+                  : Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
+                : Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
             : Goals extends readonly [
                   ["times", infer X, infer Y, infer Z],
                   ...infer RGoals extends readonly unknown[],
@@ -314,11 +339,11 @@ export type Run<
                   ? ArithBind<X, L, RGoals, A, FDB> extends infer F2
                     ? F2 extends false
                       ? Run<
-                          [[[["between", L2, H, X], ...RGoals], A, FDB, FDB], ...Rest],
+                          [[[["between", L2, H, X], ...RGoals], A, "?", FDB], ...Rest],
                           Ans, P, C, [...F, 0]
                         >
                       : Run<
-                          [F2, [[["between", L2, H, X], ...RGoals], A, FDB, FDB], ...Rest],
+                          [F2, [[["between", L2, H, X], ...RGoals], A, "?", FDB], ...Rest],
                           Ans, P, C, [...F, 0]
                         >
                     : never
@@ -328,7 +353,7 @@ export type Run<
                   ["findall", infer T, infer G, infer R],
                   ...infer RGoals extends readonly unknown[],
                 ]
-              ? RunLoop<[[[G], T, FDB, FDB]], [], `${P}${C["length"]}x${F["length"]}f`, []> extends infer Sols extends
+              ? RunLoop<[[[G], T, "?", FDB]], [], `${P}${C["length"]}x${F["length"]}f`, []> extends infer Sols extends
                   readonly unknown[]
                 ? FindallBind<Sols, R, RGoals, A, FDB> extends infer F2
                   ? F2 extends false
@@ -345,25 +370,27 @@ export type Run<
                   ? Run<Rest, Ans, P, C, [...F, 0]>
                   : Run<[F2, ...Rest], Ans, P, C, [...F, 0]>
                 : never
-              : Cs extends readonly [infer Cl, ...infer MoreCs]
-                ? Goals extends readonly [
-                      infer G,
-                      ...infer RGoals extends readonly unknown[],
-                    ]
-                  ? Step<
-                      Freshen<Cl, `${P}${C["length"]}x${F["length"]}`>,
-                      G,
-                      RGoals,
-                      A,
-                      FDB,
-                      Rest["length"]
-                    > extends infer F2
-                    ? F2 extends false
-                      ? Run<[[Goals, A, MoreCs, FDB], ...Rest], Ans, P, C, [...F, 0]>
-                      : Run<[F2, [Goals, A, MoreCs, FDB], ...Rest], Ans, P, C, [...F, 0]>
-                    : never
+              : Goals extends readonly [
+                    infer G,
+                    ...infer RGoals extends readonly unknown[],
+                  ]
+                ? (Cs extends "?" ? Candidates<G, FDB> : Cs) extends infer CsR
+                  ? CsR extends readonly [infer Cl, ...infer MoreCs]
+                    ? Step<
+                        Freshen<Cl, `${P}${C["length"]}x${F["length"]}`>,
+                        G,
+                        RGoals,
+                        A,
+                        FDB,
+                        Rest["length"]
+                      > extends infer F2
+                      ? F2 extends false
+                        ? Run<[[Goals, A, MoreCs, FDB], ...Rest], Ans, P, C, [...F, 0]>
+                        : Run<[F2, [Goals, A, MoreCs, FDB], ...Rest], Ans, P, C, [...F, 0]>
+                      : never
+                    : Run<Rest, Ans, P, C, [...F, 0]>
                   : never
-                : Run<Rest, Ans, P, C, [...F, 0]>
+                : never
     : never
   : Ans;
 
@@ -384,7 +411,7 @@ export type RunLoop<
   : never;
 
 export type QueryM<G, DB extends readonly unknown[]> = RunLoop<
-  [[[G], G, DB, DB]],
+  [[[G], G, "?", DB]],
   [],
   "",
   []

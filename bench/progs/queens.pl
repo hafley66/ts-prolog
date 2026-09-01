@@ -18,7 +18,7 @@ place(L, Acc, Qs) :-
     ok(Q, Acc, 1),
     place(R, [Q|Acc], Qs).
 
-queens(Qs) :- place([1, 2, 3, 4], [], Qs).
+queens(Qs) :- place([1, 2, 3, 4, 5], [], Qs).
 
 jlist(L, S) :-
     atomic_list_concat(L, ',', Inner),

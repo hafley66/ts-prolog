@@ -187,7 +187,7 @@ PROBLEMS = {
             '    ["ok", Var<"Q">, Var<"Acc">, 1],\n'
             '    ["place", Var<"R">, ["cons", Var<"Q">, Var<"Acc">], Var<"Qs">],\n  ]',
             '[["queens", Var<"Qs">], ["place", '
-            + cons_raw(["1", "2", "3", "4"])
+            + cons_raw(["1", "2", "3", "4", "5"])
             + ', "nil", Var<"Qs">]]',
         ),
         '["queens", Var<"Qs">]',

@@ -51,7 +51,7 @@ type AliasDB = [
 type _copy_semantics = Expect<
   Equal<
     QueryM<["alias", Var<"Y">, Var<"L">], AliasDB>,
-    [["alias", "a", ["cons", Var<"X.0x4f0x0">, ["cons", "b", "nil"]]]]
+    [["alias", "a", ["cons", Var<"X.0x1f0x0">, ["cons", "b", "nil"]]]]
   >
 >;
 

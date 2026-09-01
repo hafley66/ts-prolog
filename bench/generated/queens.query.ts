@@ -22,6 +22,6 @@ type DB = [
     ["ok", Var<"Q">, Var<"Acc">, 1],
     ["place", Var<"R">, ["cons", Var<"Q">, Var<"Acc">], Var<"Qs">],
   ],
-  [["queens", Var<"Qs">], ["place", ["cons", 1, ["cons", 2, ["cons", 3, ["cons", 4, "nil"]]]], "nil", Var<"Qs">]],
+  [["queens", Var<"Qs">], ["place", ["cons", 1, ["cons", 2, ["cons", 3, ["cons", 4, ["cons", 5, "nil"]]]]], "nil", Var<"Qs">]],
 ];
 export type Out = QueryM<["queens", Var<"Qs">], DB>;

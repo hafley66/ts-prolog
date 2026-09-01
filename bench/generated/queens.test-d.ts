@@ -22,11 +22,19 @@ type DB = [
     ["ok", Var<"Q">, Var<"Acc">, 1],
     ["place", Var<"R">, ["cons", Var<"Q">, Var<"Acc">], Var<"Qs">],
   ],
-  [["queens", Var<"Qs">], ["place", ["cons", 1, ["cons", 2, ["cons", 3, ["cons", 4, "nil"]]]], "nil", Var<"Qs">]],
+  [["queens", Var<"Qs">], ["place", ["cons", 1, ["cons", 2, ["cons", 3, ["cons", 4, ["cons", 5, "nil"]]]]], "nil", Var<"Qs">]],
 ];
 type Out = QueryM<["queens", Var<"Qs">], DB>;
 type Want = [
-  ["queens", ["cons", 3, ["cons", 1, ["cons", 4, ["cons", 2, "nil"]]]]],
-  ["queens", ["cons", 2, ["cons", 4, ["cons", 1, ["cons", 3, "nil"]]]]],
+  ["queens", ["cons", 4, ["cons", 2, ["cons", 5, ["cons", 3, ["cons", 1, "nil"]]]]]],
+  ["queens", ["cons", 3, ["cons", 5, ["cons", 2, ["cons", 4, ["cons", 1, "nil"]]]]]],
+  ["queens", ["cons", 5, ["cons", 3, ["cons", 1, ["cons", 4, ["cons", 2, "nil"]]]]]],
+  ["queens", ["cons", 4, ["cons", 1, ["cons", 3, ["cons", 5, ["cons", 2, "nil"]]]]]],
+  ["queens", ["cons", 5, ["cons", 2, ["cons", 4, ["cons", 1, ["cons", 3, "nil"]]]]]],
+  ["queens", ["cons", 1, ["cons", 4, ["cons", 2, ["cons", 5, ["cons", 3, "nil"]]]]]],
+  ["queens", ["cons", 2, ["cons", 5, ["cons", 3, ["cons", 1, ["cons", 4, "nil"]]]]]],
+  ["queens", ["cons", 1, ["cons", 3, ["cons", 5, ["cons", 2, ["cons", 4, "nil"]]]]]],
+  ["queens", ["cons", 3, ["cons", 1, ["cons", 4, ["cons", 2, ["cons", 5, "nil"]]]]]],
+  ["queens", ["cons", 2, ["cons", 4, ["cons", 1, ["cons", 3, ["cons", 5, "nil"]]]]]],
 ];
 type _match = Expect<Equal<Out, Want>>;
