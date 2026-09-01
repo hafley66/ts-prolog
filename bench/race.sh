@@ -6,7 +6,7 @@ mkdir -p bench/out
 
 ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
 
-declare -a problems=(splits chain peano hanoi perm color nrev puzzle collect queens pyth)
+declare -a problems=(splits chain peano hanoi perm color nrev puzzle collect queens pyth dyn)
 # staged zebra needs ~5GB of checker heap; CI runners OOM at 7GB total
 [ -z "${CI:-}" ] && problems+=(zebra)
 

@@ -48,7 +48,7 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 | clause DB, SLD search, backtracking | choicepoint-stack machine (src/04-machine.ts) | done |
 | cut | `"!"` -> stack-truncation barrier | done |
 | negation, once, meta-call | library clauses; a var as a goal executes its binding | done via cut |
-| asserta / assertz / retract | frame-local DB rebuilt per continuation | done; backtracking undoes changes (SWI asserts survive) |
+| asserta / assertz / retract | ONE global DB threaded through the machine in trial order; `"?"` snapshots a goal's candidates at dispatch = SWI's logical update view | done, SWI parity: asserts survive backtracking (raced exact) |
 | findall/3 | sub-derivation inside a machine step | done, sees the dynamic DB; copy semantics match SWI (free goal vars are not aliased into answers) |
 | arithmetic: plus/3, times/3, lt/2, neq/2 | native number literals, tuple-length math; plus and times are relational (times division must be exact) | done, operands bounded ~3200 (fuel-chunked Rep), products bounded 9999 |
 | between/3 | choicepoint per value, ascending | done, spans bounded 980 values |
@@ -63,7 +63,7 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 `npm run race`: SWI-Prolog 10.0.2 solves each problem and emits answers as
 JSONL; generated `Equal` assertions force tsgo to solve the same query and
 prove answer-for-answer, order-for-order agreement; a third lane extracts
-answers back out of the checker and diffs them against SWI. All 12 problems,
+answers back out of the checker and diffs them against SWI. All 13 problems,
 all lanes: exact match.
 
 | problem | answers | swipl | tsgo | agree |
@@ -79,6 +79,7 @@ all lanes: exact match.
 | findall + peano count of kids per parent | 3 | 37ms | 437ms | yes |
 | 5-queens (native number arithmetic) | 10 | 31ms | 3962ms | yes |
 | pythagorean triples, legs to 13 (between + times) | 4 | 30ms | 1771ms | yes |
+| assert inside a failing branch, collected after backtracking | 1 | 30ms | 342ms | yes |
 | full 5-house zebra puzzle, all 14 clues (staged: 30 Pump aliases) | 1 | 30ms | 47s | yes |
 
 Wall clock is mostly process startup on both sides (swipl 67ms, npx+tsgo
@@ -313,8 +314,10 @@ Findings, each isolated by its own probe:
   clause body) is not transformed. `"?"` is reserved as the frame marker
   for an unresolved clause bucket.
 - `retract` is deterministic (first match, no re-satisfaction on
-  backtracking); SWI's retract re-satisfies. Asserts are undone by
-  backtracking here, and survive it in SWI.
+  backtracking); SWI's retract re-satisfies. That is the one remaining
+  dynamic-DB divergence: asserts now survive backtracking exactly as in
+  SWI, since the DB is a single value threaded through the machine in
+  trial order rather than a frame-local slot.
 - Unbound vars collected by `findall` keep sub-derivation-scoped names,
   loosely matching `copy_term` semantics.
 

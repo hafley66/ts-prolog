@@ -33,13 +33,15 @@ type _retract_binds = Expect<
 >;
 type _retract_missing_fails = Expect<Equal<QueryM<["nofact"], DB>, []>>;
 
-// backtracking discards the branch's asserts: clause 1 asserts then fails,
-// clause 2 must not see leftover(x)
+// SWI parity: asserts SURVIVE backtracking (global DB threaded in trial
+// order); clause 1 asserts then fails, clause 2 sees leftover(x)
 type ScopeSrc = [
   "try(X) :- assertz(leftover(x)), fail",
   "try(X) :- leftover(X)",
 ];
-type _backtrack_scoped = Expect<Equal<Query<"try(W)", ScopeSrc>, []>>;
+type _backtrack_survives = Expect<
+  Equal<Query<"try(W)", ScopeSrc>, [["try", "x"]]>
+>;
 
 // memo shape through the string surface
 type MemoSrc = [

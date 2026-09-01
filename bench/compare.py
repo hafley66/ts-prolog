@@ -42,6 +42,8 @@ def normalize(problem, answer):
         return {"p": answer[1], "kids": uncons(answer[2]), "n": unpeano(answer[3])}
     if problem == "queens":
         return {"q": uncons(answer[1])}
+    if problem == "dyn":
+        return {"l": uncons(answer[1])}
     if problem == "zebra":
         return {"who": answer[1]}
     if problem == "pyth":

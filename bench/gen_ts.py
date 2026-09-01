@@ -207,6 +207,17 @@ PROBLEMS = {
         '["pyth", Var<"X">, Var<"Y">, Var<"Z">]',
         lambda r: f'["pyth", {r["x"]}, {r["y"]}, {r["z"]}]',
     ),
+    "dyn": (
+        clauses(
+            '[["mem2", Var<"X">, ["cons", Var<"X">, Var<"T">]]]',
+            '[["mem2", Var<"X">, ["cons", Var<"H">, Var<"T">]], ["mem2", Var<"X">, Var<"T">]]',
+            f'[["mark"], ["mem2", Var<"X">, {cons(["a", "b", "c"])}], ["assertz", ["saw", Var<"X">]], ["fail"]]',
+            '[["mark"]]',
+            '[["dyn", Var<"L">], ["mark"], ["findall", Var<"X">, ["saw", Var<"X">], Var<"L">]]',
+        ),
+        '["dyn", Var<"L">]',
+        lambda r: f'["dyn", {cons(r["l"])}]',
+    ),
     "nrev": (
         clauses(
             *APP,
