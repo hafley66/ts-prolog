@@ -31,6 +31,7 @@ and `npm run check:tsc` (3.0s) verify 12 test suites and 7 demo files.
 - [Which TypeScript](#which-typescript)
 - [Demos: types that enforce rules](#demos-types-that-enforce-rules)
 - [Closing the loop: types that cause effects](#closing-the-loop-types-that-cause-effects)
+- [Datalog on union types](#datalog-on-union-types)
 - [Engine internals](#engine-internals)
 - [Layout](#layout)
 - [Non-goals](#non-goals)
@@ -211,6 +212,28 @@ steps), executes the first answer's effect, appends `done(step)` to the
 generated facts file, and repeats to fixpoint. Effects are proof-gated: a
 program that fails to typecheck runs nothing. Each cycle re-queries a small
 delta, never the history.
+
+## Datalog on union types
+
+The Prolog machine parses nothing at its core (strings are optional sugar
+over tuple terms), and src/09-datalog.ts drops the machine too: a relation
+is a union of pairs, so the checker's own set semantics do the work. `Join`
+is one distributive conditional, `TC` is semi-naive transitive closure
+(only the newest pairs re-join each round), `DirectEdges` is stratified
+negation via `Exclude`.
+
+The fact base can be the TypeScript type graph itself. `SubEdges<Registry>`
+probes assignability between every pair of a named-type registry;
+`DirectEdges` of that recovers the declared inheritance hierarchy (the
+Hasse diagram of the subtype lattice); `UsesEdges` traces service
+dependencies out of property and method-return types, and `InCycle` flags
+circular dependencies at compile time. demos/trace-types.test-d.ts pins all
+of it: no strings, no `Var`, no engine, just types querying types.
+
+| probe | last pass | first fail | note |
+| --- | --- | --- | --- |
+| TC chain length, semi-naive | 106 | 107 | closure holds 5671 pairs |
+| TC chain length, path doubling | 32 | 33 | replaced: join cost squares with the closure |
 
 ## Engine internals
 

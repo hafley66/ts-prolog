@@ -474,7 +474,19 @@ def p_stagednrev(n):
     )
 
 
+# union-datalog transitive closure over an n-edge chain: closure holds
+# n(n+1)/2 pairs, racing the 100k union-size cap and the join budget
+def p_dltc(n):
+    edges = " | ".join(f'["e{i}", "e{i + 1}"]' for i in range(n))
+    return (
+        'import type { TC } from "../../../src/09-datalog";\n'
+        f"type E = {edges};\n"
+        f'type _c = Expect<Equal<["e0", "e{n}"] extends TC<E> ? true : false, true>>;\n'
+    )
+
+
 PROBES = {
+    "dltc": p_dltc,
     "zebra3": p_zebra3,
     "zebra4": p_zebra4,
     "staged": p_staged,
