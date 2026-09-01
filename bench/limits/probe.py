@@ -17,7 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 GEN = pathlib.Path(__file__).parent / "generated"
 GEN.mkdir(exist_ok=True)
 RESULTS = pathlib.Path(__file__).parent / "results.jsonl"
-TIMEOUT = 240
+TIMEOUT = int(os.environ.get("PROBE_TIMEOUT", "240"))
 
 ENGINE = os.environ.get("ENGINE", "v4")
 if ENGINE == "v5":
@@ -441,12 +441,47 @@ def p_zebra5(n):
     )
 
 
+# wrap any QueryM probe source in a Pump alias chain; the QueryM line is
+# replaced by staged evaluation of the same goal
+def stagedify(src, goal, stages, check):
+    db = src[: src.index("type Out")]
+    chain = f"type S0 = PumpStart<{goal}, DB>;\n" + "".join(
+        f"type S{i + 1} = Pump<S{i}, 1>;\n" for i in range(stages)
+    )
+    return (
+        'import type { Pump, PumpStart } from "../../../src/04-machine";\n'
+        + db + chain
+        + f'type Fin = S{stages} extends readonly unknown[] ? S{stages} : "unfinished";\n'
+        + check
+    )
+
+
+QSTAGES = {5: 16, 6: 40, 7: 120, 8: 400}
+
+
+def p_stagedqueens(n):
+    return stagedify(
+        p_queens(n), '["queens", Var<"Qs">]', QSTAGES[n],
+        f'type _c = Expect<Equal<Fin extends readonly unknown[] ? Fin["length"] : Fin, {QCOUNT[n]}>>;\n',
+    )
+
+
+def p_stagednrev(n):
+    return stagedify(
+        p_nrev(n), '["nrev", ' + cons([f"e{i}" for i in range(1, n + 1)]) + ', Var<"R">]',
+        n * n // 100 + 12,
+        'type _c = Expect<Equal<Fin extends readonly unknown[] ? Fin["length"] : Fin, 1>>;\n',
+    )
+
+
 PROBES = {
     "zebra3": p_zebra3,
     "zebra4": p_zebra4,
     "staged": p_staged,
     "stagedchain": p_stagedchain,
     "zebra5": p_zebra5,
+    "stagedqueens": p_stagedqueens,
+    "stagednrev": p_stagednrev,
     "parsedeep": p_parsedeep,
     "parselong": p_parselong,
     "zebra": p_zebra,

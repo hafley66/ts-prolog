@@ -131,7 +131,8 @@ walls.
 | flat conjunction goal count | 303 | 304 | TS2589 | per-step goal-list rewrite, work = steps x state; indexing's per-goal bucket scan cost one unit here (was 304) |
 | naive reverse list length | 32 | 33 | TS2589 | O(n^2) steps on a growing term (was 30 pre-indexing) |
 | ancestor chain length | 48 | 49 | TS2589 | answer tuple + goal list both grow with n (was 38 pre-indexing) |
-| n-queens | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
+| n-queens, single alias | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
+| n-queens, staged | 7 | 8 untried | - | 6-queens 17.6s/5.8GB (40 aliases), 7-queens 262s/6.9GB (120 aliases); 8 projects past a 16GB machine |
 | 5-house zebra clue count, single alias | 5 of 14 | 6 | TS2589 | search volume x state; clue reordering (10x fewer SWI inferences), attribute-list and staged-predicate reformulations all still die single-alias |
 | 5-house zebra, staged across 30 aliases | 14 of 14 | - | - | solved: `[["zebra", "german"]]`, 47-86s, ~5GB, raced vs SWI exact |
 
@@ -248,10 +249,13 @@ Findings, each isolated by its own probe:
   is per-alias-evaluation. `Pump<St, M>` advances a paused machine marker
   M fuel chunks; a chain `S1 = Pump<S0, 1>; S2 = Pump<S1, 1>; ...` gets a
   fresh budget per alias because each is memoized before the next starts.
-  Staged chain n=100 passes (single-alias ceiling 48) and the full
-  14-clue zebra solves in 30 stages. The remaining walls are wall-clock
-  and RAM (~5GB at zebra scale), plus the per-chunk budget: one 512-step
-  chunk over a big state can still bust 5M alone (staged flat dies at 400).
+  Staged chain n=100 passes (single-alias ceiling 48), the full 14-clue
+  zebra solves in 30 stages, and 6- and 7-queens solve in 40/120 stages
+  after dying on every single-alias engine. The remaining walls are
+  wall-clock and RAM (7-queens: 262s, 6.9GB; every stage's evaluation
+  stays memoized), plus the per-chunk budget: one 512-step chunk over a
+  big state still busts 5M alone (staged flat dies at 400, staged nrev
+  at 40).
 - `Equal` on two 30-deep cons chains trips the comparison stack guard
   (TS2321) even when the answer computed fine; deep answers get unrolled to
   flat tuples before comparison.

@@ -335,3 +335,6 @@
 {"probe": "stagedchain", "n": 60, "ms": 4549, "rss_mb": 1140.1, "status": "pass", "engine": "v4"}
 {"probe": "stagedchain", "n": 100, "ms": 17620, "rss_mb": 3431.8, "status": "pass", "engine": "v4"}
 {"probe": "zebra5", "n": 30, "ms": 85677, "rss_mb": 5184.6, "status": "pass", "engine": "v4"}
+{"probe": "stagedqueens", "n": 6, "ms": 17626, "rss_mb": 5777.4, "status": "pass", "engine": "v4"}
+{"probe": "stagednrev", "n": 40, "ms": 6969, "rss_mb": 2708.2, "status": "TS2589", "engine": "v4"}
+{"probe": "stagedqueens", "n": 7, "ms": 262446, "rss_mb": 6925.0, "status": "pass", "engine": "v4"}
