@@ -43,7 +43,7 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 
 | Prolog piece | how | status |
 | --- | --- | --- |
-| terms | string/number literals, `Var<N>`, tuples | done |
+| terms | string/number literals, `Var<N>` (a guillemet-branded string), tuples | done |
 | unification + occurs check | subst threaded through conditionals, worklist occurs walk | done |
 | clause DB, SLD search, backtracking | choicepoint-stack machine (src/04-machine.ts) | done |
 | cut | `"!"` -> stack-truncation barrier | done |
@@ -126,12 +126,12 @@ walls.
 | times product | 9801 (99x99) | 10000 (100x100) | TS2799 | tuple hard cap at 10000 elements |
 | times division (n * Y = n^2) | n=56 (3136) | n=57 (3249) | TS2589 | same ~3.2k tuple wall on the product operand (was 31) |
 | between span | 980 | 981 | TS2589 | answer volume x per-value bound checks; chunked Rep cost 18 values (was 998) |
-| unification nesting depth `f(f(...))` | 95 | 96 | TS2589 | Unify recurses per nesting level, not fuel-chunked |
-| parser nesting depth `f(f(...))` | 91 | 92 | TS2589 | same shape in the template-literal parser |
+| unification nesting depth `f(f(...))` | 20000+ | none found | - | was 95: worklist Unify + string-encoded vars removed the wall; 20000 deep runs 196s/5GB, bounded by work not depth |
+| parser nesting depth `f(f(...))` | 91 | 92 | TS2589 | the template-literal parser still recurses per nesting level (not yet worklisted) |
 | parser flat arity `f(a, ..., a)` | 500+ | - | - | flat scans are tail-recursive, no wall found |
 | flat conjunction goal count | 303 | 304 | TS2589 | per-step goal-list rewrite, work = steps x state; indexing's per-goal bucket scan cost one unit here (was 304) |
 | naive reverse list length | 32 | 33 | TS2589 | O(n^2) steps on a growing term (was 30 pre-indexing) |
-| ancestor chain length | 48 | 49 | TS2589 | answer tuple + goal list both grow with n (was 38 pre-indexing) |
+| ancestor chain length | 45 | 46 | TS2589 | answer tuple + goal list both grow with n (38 pre-indexing, 48 before the worklist unifier's small constant) |
 | n-queens, single alias | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
 | n-queens, staged | 7 | 8 untried | - | 6-queens 17.6s/5.8GB (40 aliases), 7-queens 262s/6.9GB (120 aliases); 8 projects past a 16GB machine |
 | 5-house zebra clue count, single alias | 5 of 14 | 6 | TS2589 | search volume x state; clue reordering (10x fewer SWI inferences), attribute-list and staged-predicate reformulations all still die single-alias |
@@ -259,6 +259,13 @@ Findings, each isolated by its own probe:
 - Tail-call elimination is real and survives nested conditionals,
   `extends infer` chains, and frame destructuring. Non-tail recursion dies
   at ~100 depth; tail loops run ~1000 iterations per evaluation.
+- Term nesting depth was capped ~95 by two independent causes, isolated by
+  probe: (1) the recursive `UnifyArgs` descent, replaced by a fuel-chunked
+  worklist unifier (src/02-unify.ts); (2) OBJECT types nested ~94 deep trip
+  the checker's depth guard even untouched, while string literals run
+  20000+, so `Var<N>` became a guillemet-branded string. A generic-alias
+  spelling (`Var<"X">`) written 96 deep in a source literal still trips the
+  guard; the expanded value form does not.
 - The substitution must never store unforced projections. Binding
   `infer`-captured tails builds a lazy tower that re-derives all history on
   every walk. Fix: unify against an empty subst, apply it to the remaining

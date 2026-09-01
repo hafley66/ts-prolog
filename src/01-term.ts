@@ -1,7 +1,8 @@
-// atom = string literal, variable = Var<N>, compound = [functor, ...args]
-export type Var<N extends string> = { readonly var: N };
+// atom = string literal, variable = Var<N> (a guillemet-branded string:
+// object-typed vars trip the checker's depth guard ~94 deep, strings run 2000+)
+export type Var<N extends string> = `‹${N}›`;
 
-export type Term = string | Var<string> | readonly Term[];
+export type Term = string | readonly Term[];
 
 // values typed unknown: infer positions cannot prove Term-ness
 export type Subst = { readonly [k: string]: unknown };

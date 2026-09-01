@@ -1,4 +1,4 @@
-import type { Subst, Walk } from "./01-term";
+import type { Subst, Var, Walk } from "./01-term";
 import type { Unify } from "./02-unify";
 import type { Freshen } from "./03-solve";
 import type { Arm, Candidates, Diff, Rep, RTerm, Sum, Trunc } from "./04-machine";
@@ -123,11 +123,13 @@ export type RunK<
                           infer WX extends string | number,
                           infer WY extends string | number,
                         ]
-                        ? WX extends WY
-                          ? WY extends WX
-                            ? RunK<Rest, Ans, K, P, C, [...F, 0]>
+                        ? [WX, WY] extends [Exclude<WX, Var<string>>, Exclude<WY, Var<string>>]
+                          ? WX extends WY
+                            ? WY extends WX
+                              ? RunK<Rest, Ans, K, P, C, [...F, 0]>
+                              : RunK<[[RGoals, A, S, "?", FDB, [...N, 0]], ...Rest], Ans, K, P, C, [...F, 0]>
                             : RunK<[[RGoals, A, S, "?", FDB, [...N, 0]], ...Rest], Ans, K, P, C, [...F, 0]>
-                          : RunK<[[RGoals, A, S, "?", FDB, [...N, 0]], ...Rest], Ans, K, P, C, [...F, 0]>
+                          : RunK<Rest, Ans, K, P, C, [...F, 0]>
                         : RunK<Rest, Ans, K, P, C, [...F, 0]>
                       : (Cs extends "?" ? Candidates<GW, FDB> : Cs) extends infer CsR
                         ? CsR extends readonly [infer Cl, ...infer MoreCs]

@@ -62,9 +62,11 @@ type Bucket<
   : Acc;
 
 export type Candidates<G, FDB extends readonly unknown[]> = Functor<G> extends infer F0
-  ? F0 extends string | number
-    ? Bucket<F0, FDB, []>
-    : FDB
+  ? F0 extends Var<string>
+    ? FDB
+    : F0 extends string | number
+      ? Bucket<F0, FDB, []>
+      : FDB
   : never;
 
 // "!" in a clause body becomes ["$cut", N]: N = stack depth below this
@@ -354,11 +356,13 @@ export type Run<
                   ["neq", infer X extends string | number, infer Y extends string | number],
                   ...infer RGoals extends readonly unknown[],
                 ]
-              ? X extends Y
-                ? Y extends X
-                  ? Run<Rest, Ans, P, C, [...F, 0]>
+              ? [X, Y] extends [Exclude<X, Var<string>>, Exclude<Y, Var<string>>]
+                ? X extends Y
+                  ? Y extends X
+                    ? Run<Rest, Ans, P, C, [...F, 0]>
+                    : Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
                   : Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
-                : Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
+                : Run<Rest, Ans, P, C, [...F, 0]>
             : Goals extends readonly [
                   ["times", infer X, infer Y, infer Z],
                   ...infer RGoals extends readonly unknown[],

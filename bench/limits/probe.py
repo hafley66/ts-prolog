@@ -110,7 +110,7 @@ def p_diff(n):
 
 def p_deep(n):
     a = '"a"'
-    b = 'Var<"X">'
+    b = '"‹X›"'
     for _ in range(n):
         a = f'["f", {a}]'
         b = f'["f", {b}]'
