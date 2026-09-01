@@ -132,6 +132,24 @@ walls.
 | n-queens | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
 | 5-house zebra clue count | 5 of 14 | 6 | TS2589 | dies in ~4s / 1.3GB; the wall is mem/right search volume x the 35-node houses term, and indexing bought exactly one clue (was 4) |
 
+The v5 structure-sharing experiment (src/07-machine-v5.ts, plus/lt/neq/cut
+only) moves the same walls instead of removing them, in opposite directions
+per workload:
+
+| probe | v4 (shipped) | v5 (experiment) |
+| --- | --- | --- |
+| flat conjunction goal count | 303 | 1610 |
+| naive reverse list length | 32 | 6 |
+| ancestor chain length | 48 | 43 |
+| n-queens | 5 | 4 |
+| 5-house zebra clue count | 5 | 5, at 2.5x the wall-clock |
+
+Same answers, same order, on everything both engines run
+(tests/machine-v5.test-d.ts pins that). The split is the per-step cost
+model: v4 pays O(goal-list) rewriting every step, v5 pays walk chains whose
+depth follows data flow. Accumulator recursion is the worst case for
+chains and the reason v4 stays the shipped engine.
+
 Peak checker RSS scales with the grind: passing runs near a wall hit 3-4GB
 (flat n=304: 3.6GB; nrev n=30: 3.5GB). One engine bug fell out of the
 between probe: embedding a lazy `Sum<L, 1>` in the retry goal chained
@@ -201,6 +219,7 @@ commands live in the git history.
 | f0e576a (v2) | resolution by rewriting: per-step subst applied to goals + answer then discarded; `RTerm` iterative postorder resolver | n = 60 deep, ~250 flat steps | ~1000 tail iterations per evaluation caps step count |
 | 5f2636c (v3) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; wrapper loops restart the tail budget; fresh names from chunk-x-fuel pairs | 4-queens' ~4k steps pass; big states still die | binding constraint is total work, steps x state size, vs the ~5M global instantiation budget |
 | v4 (shipped) | v3 + first-argument indexing: a frame's clause slot starts as a `"?"` marker, resolved on first dispatch to the goal-functor's bucket (`Candidates`/`Bucket`), folded into the same step | 5-queens passes, 6 dies; full zebra still out (5 of 14 clues) | failed clause trials cost a deep `Freshen` each; filtering by functor first bought 10-26% on search problems, and an early two-step version showed one extra machine step per goal costs more than a small DB scan |
+| v5 (experiment, src/07-machine-v5.ts) | structure sharing: goals never rewritten, the branch subst is threaded through `Unify` and resolved into a term once per answer | flat conjunctions 303 -> 1610; nrev 32 -> 6, 5-queens lost | v1's lazy tower, quantified: walk chains grow with data-flow depth, so accumulator recursion re-derives history per step (nrev n=19 grinds 55s before TS2589) while wide-shallow goal lists gain 5x |
 
 Findings, each isolated by its own probe:
 

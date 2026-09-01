@@ -203,3 +203,47 @@
 {"probe": "nrev", "n": 34, "ms": 19748, "rss_mb": 3823.1, "status": "TS2589"}
 {"probe": "nrev", "n": 32, "ms": 21432, "rss_mb": 3411.3, "status": "pass"}
 {"probe": "nrev", "n": 33, "ms": 18939, "rss_mb": 3634.6, "status": "TS2589"}
+{"probe": "chain", "n": 5, "ms": 617, "rss_mb": 128.1, "status": "pass", "engine": "v5"}
+{"probe": "nrev", "n": 4, "ms": 524, "rss_mb": 130.1, "status": "pass", "engine": "v5"}
+{"probe": "queens", "n": 4, "ms": 2096, "rss_mb": 486.2, "status": "pass", "engine": "v5"}
+{"probe": "zebra", "n": 2, "ms": 481, "rss_mb": 150.9, "status": "pass", "engine": "v5"}
+{"probe": "zebra", "n": 5, "ms": 8639, "rss_mb": 987.9, "status": "pass", "engine": "v5"}
+{"probe": "zebra", "n": 6, "ms": 12852, "rss_mb": 1061.4, "status": "TS2589", "engine": "v5"}
+{"probe": "zebra", "n": 8, "ms": 25020, "rss_mb": 1172.1, "status": "TS2589", "engine": "v5"}
+{"probe": "zebra", "n": 11, "ms": 35273, "rss_mb": 1205.8, "status": "TS2589", "engine": "v5"}
+{"probe": "zebra", "n": 14, "ms": 44723, "rss_mb": 1152.3, "status": "TS2589", "engine": "v5"}
+{"probe": "queens", "n": 5, "ms": 17162, "rss_mb": 1218.6, "status": "TS2589", "engine": "v5"}
+{"probe": "queens", "n": 6, "ms": 45602, "rss_mb": 1679.6, "status": "TS2589", "engine": "v5"}
+{"probe": "chain", "n": 10, "ms": 726, "rss_mb": 169.1, "status": "pass", "engine": "v5"}
+{"probe": "chain", "n": 400, "ms": 6343, "rss_mb": 979.5, "status": "TS2589", "engine": "v5"}
+{"probe": "chain", "n": 205, "ms": 4278, "rss_mb": 856.8, "status": "TS2589", "engine": "v5"}
+{"probe": "chain", "n": 107, "ms": 3280, "rss_mb": 663.5, "status": "TS2589", "engine": "v5"}
+{"probe": "chain", "n": 58, "ms": 2656, "rss_mb": 668.6, "status": "TS2589", "engine": "v5"}
+{"probe": "chain", "n": 34, "ms": 1661, "rss_mb": 518.5, "status": "pass", "engine": "v5"}
+{"probe": "chain", "n": 46, "ms": 2637, "rss_mb": 624.3, "status": "TS2589", "engine": "v5"}
+{"probe": "chain", "n": 40, "ms": 2326, "rss_mb": 561.7, "status": "pass", "engine": "v5"}
+{"probe": "chain", "n": 43, "ms": 2831, "rss_mb": 555.3, "status": "pass", "engine": "v5"}
+{"probe": "chain", "n": 44, "ms": 2611, "rss_mb": 651.5, "status": "TS2589", "engine": "v5"}
+{"probe": "nrev", "n": 6, "ms": 604, "rss_mb": 184.8, "status": "pass", "engine": "v5"}
+{"probe": "nrev", "n": 60, "ms": 67829, "rss_mb": 862.3, "status": "TS2589", "engine": "v5"}
+{"probe": "nrev", "n": 33, "ms": 60538, "rss_mb": 780.9, "status": "TS2589", "engine": "v5"}
+{"probe": "nrev", "n": 19, "ms": 55834, "rss_mb": 738.8, "status": "TS2589", "engine": "v5"}
+{"probe": "nrev", "n": 12, "ms": 37276, "rss_mb": 577.5, "status": "TS2589", "engine": "v5"}
+{"probe": "nrev", "n": 9, "ms": 4827, "rss_mb": 308.1, "status": "TS2589", "engine": "v5"}
+{"probe": "nrev", "n": 7, "ms": 796, "rss_mb": 217.1, "status": "TS2589", "engine": "v5"}
+{"probe": "flat", "n": 100, "ms": 346, "rss_mb": 151.9, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 600, "ms": 6985, "rss_mb": 765.5, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 600, "ms": 6939, "rss_mb": 749.8, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 3000, "ms": 89602, "rss_mb": 4261.6, "status": "TS2589", "engine": "v5"}
+{"probe": "flat", "n": 1800, "ms": 69562, "rss_mb": 3494.3, "status": "TS2589", "engine": "v5"}
+{"probe": "flat", "n": 1200, "ms": 45596, "rss_mb": 2191.3, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1500, "ms": 85436, "rss_mb": 3383.4, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1650, "ms": 61915, "rss_mb": 3390.0, "status": "TS2589", "engine": "v5"}
+{"probe": "flat", "n": 1575, "ms": 97993, "rss_mb": 3765.3, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1612, "ms": 60791, "rss_mb": 3395.2, "status": "TS2589", "engine": "v5"}
+{"probe": "flat", "n": 1593, "ms": 102899, "rss_mb": 3934.7, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1602, "ms": 105091, "rss_mb": 3944.1, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1607, "ms": 112517, "rss_mb": 3663.0, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1609, "ms": 115392, "rss_mb": 3620.4, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1610, "ms": 106896, "rss_mb": 4004.2, "status": "pass", "engine": "v5"}
+{"probe": "flat", "n": 1611, "ms": 61356, "rss_mb": 3421.2, "status": "TS2589", "engine": "v5"}

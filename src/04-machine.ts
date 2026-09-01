@@ -28,7 +28,7 @@ type RTermC<
       ? RTermC<PIn, [...PDone, Done], Rest, S, [...F, 0]>
       : Done;
 
-type RTerm<
+export type RTerm<
   In extends readonly unknown[],
   Done extends readonly unknown[],
   Stack extends readonly unknown[],
@@ -61,7 +61,7 @@ type Bucket<
     : Bucket<F0, More, [...Acc, Cl]>
   : Acc;
 
-type Candidates<G, FDB extends readonly unknown[]> = Functor<G> extends infer F0
+export type Candidates<G, FDB extends readonly unknown[]> = Functor<G> extends infer F0
   ? F0 extends string | number
     ? Bucket<F0, FDB, []>
     : FDB
@@ -69,11 +69,11 @@ type Candidates<G, FDB extends readonly unknown[]> = Functor<G> extends infer F0
 
 // "!" in a clause body becomes ["$cut", N]: N = stack depth below this
 // goal's alternatives, the barrier to truncate back to
-type Arm<Body, N extends number> = {
+export type Arm<Body, N extends number> = {
   [K in keyof Body]: Body[K] extends "!" ? ["$cut", N] : Body[K];
 };
 
-type Trunc<
+export type Trunc<
   S extends readonly unknown[],
   N extends number,
 > = S["length"] extends N
@@ -138,14 +138,14 @@ type ToCons<Xs extends readonly unknown[]> = Xs extends readonly [
   ? ["cons", H, ToCons<R>]
   : "nil";
 
-type Rep<N extends number, Acc extends readonly 0[] = []> = Acc["length"] extends N
+export type Rep<N extends number, Acc extends readonly 0[] = []> = Acc["length"] extends N
   ? Acc
   : Rep<N, [...Acc, 0]>;
 
-type Sum<A extends number, B extends number> = [...Rep<A>, ...Rep<B>]["length"];
+export type Sum<A extends number, B extends number> = [...Rep<A>, ...Rep<B>]["length"];
 
 // C - A, or false when A > C
-type Diff<C extends number, A extends number> = Rep<C> extends [
+export type Diff<C extends number, A extends number> = Rep<C> extends [
   ...Rep<A>,
   ...infer R,
 ]

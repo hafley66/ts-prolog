@@ -6,6 +6,7 @@ usage:
   probe.py <name> <n> [<n> ...]         run sizes
   probe.py <name> --bisect <lo> <hi>    lo must pass, hi must fail; prints ceiling
 """
+import os
 import pathlib
 import re
 import subprocess
@@ -18,11 +19,17 @@ GEN.mkdir(exist_ok=True)
 RESULTS = pathlib.Path(__file__).parent / "results.jsonl"
 TIMEOUT = 240
 
+ENGINE = os.environ.get("ENGINE", "v4")
+MACHINE = (
+    'import type { QueryM5 as QueryM } from "../../../src/07-machine-v5";\n'
+    if ENGINE == "v5"
+    else 'import type { QueryM } from "../../../src/04-machine";\n'
+)
 HEADER = (
     'import type { Var } from "../../../src/01-term";\n'
     'import type { Unify } from "../../../src/02-unify";\n'
-    'import type { QueryM } from "../../../src/04-machine";\n'
-    'import type { Term } from "../../../src/05-parse";\n'
+    + MACHINE
+    + 'import type { Term } from "../../../src/05-parse";\n'
     'import type { Equal, Expect } from "../../../tests/util";\n\n'
 )
 
@@ -258,7 +265,7 @@ PROBES = {
 
 def run(name, n):
     src = HEADER + PROBES[name](n)
-    f = GEN / f"{name}.{n}.ts"
+    f = GEN / f"{name}.{n}.{ENGINE}.ts"
     f.write_text(src)
     t0 = time.time()
     status = "pass"
@@ -279,7 +286,8 @@ def run(name, n):
     except subprocess.TimeoutExpired:
         status = "timeout"
     ms = int((time.time() - t0) * 1000)
-    rec = {"probe": name, "n": n, "ms": ms, "rss_mb": rss_mb, "status": status}
+    rec = {"probe": name, "n": n, "ms": ms, "rss_mb": rss_mb, "status": status,
+           "engine": ENGINE}
     with RESULTS.open("a") as fh:
         import json
         fh.write(json.dumps(rec) + "\n")
