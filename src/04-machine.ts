@@ -138,19 +138,44 @@ type ToCons<Xs extends readonly unknown[]> = Xs extends readonly [
   ? ["cons", H, ToCons<R>]
   : "nil";
 
-export type Rep<N extends number, Acc extends readonly 0[] = []> = Acc["length"] extends N
-  ? Acc
-  : Rep<N, [...Acc, 0]>;
+// fuel-chunked like Run: the wrapper re-entry resets the tail budget, so
+// values run to the 10000-element tuple cap instead of the ~1000 tail cap
+type RepC<
+  N extends number,
+  Acc extends readonly 0[],
+  F extends readonly 0[],
+> = F["length"] extends 512
+  ? { r: Acc }
+  : Acc["length"] extends N
+    ? Acc
+    : RepC<N, [...Acc, 0], [...F, 0]>;
 
-export type Sum<A extends number, B extends number> = [...Rep<A>, ...Rep<B>]["length"];
+export type Rep<N extends number, Acc extends readonly 0[] = []> = RepC<
+  N,
+  Acc,
+  []
+> extends infer R
+  ? R extends { r: infer A2 extends readonly 0[] }
+    ? Rep<N, A2>
+    : R
+  : never;
+
+export type Sum<A extends number, B extends number> = [Rep<A>, Rep<B>] extends [
+  infer RA extends readonly 0[],
+  infer RB extends readonly 0[],
+]
+  ? [...RA, ...RB]["length"]
+  : never;
 
 // C - A, or false when A > C
-export type Diff<C extends number, A extends number> = Rep<C> extends [
-  ...Rep<A>,
-  ...infer R,
+export type Diff<C extends number, A extends number> = [Rep<C>, Rep<A>] extends [
+  infer RC extends readonly 0[],
+  infer RA extends readonly 0[],
 ]
-  ? R["length"]
-  : false;
+  ? RC extends readonly [...RA, ...infer R]
+    ? R["length"]
+    : false
+  : never;
 
 // A*B by repeated concat of a cached Rep<A>; tail-recursive over B
 type MulT<
@@ -161,7 +186,12 @@ type MulT<
   ? MulT<RA, R, [...Acc, ...RA]>
   : Acc["length"];
 
-type Mul<A extends number, B extends number> = MulT<Rep<A>, Rep<B>, []>;
+type Mul<A extends number, B extends number> = [Rep<A>, Rep<B>] extends [
+  infer RA extends readonly 0[],
+  infer RB extends readonly 0[],
+]
+  ? MulT<RA, RB, []>
+  : never;
 
 // Z / X exact via repeated subtraction; false on remainder, and on X = 0
 // (X = 0, Z = 0 admits every Y: fail like SWI's instantiation error)
@@ -177,7 +207,12 @@ type DivT<
 
 type DivExact<Z extends number, X extends number> = X extends 0
   ? false
-  : DivT<Rep<X>, Rep<Z>, []>;
+  : [Rep<X>, Rep<Z>] extends [
+        infer RX extends readonly 0[],
+        infer RZ extends readonly 0[],
+      ]
+    ? DivT<RX, RZ, []>
+    : never;
 
 // unify Slot with the computed value, substitute into the continuation
 type ArithBind<
@@ -307,9 +342,14 @@ export type Run<
                   ["lt", infer X extends number, infer Y extends number],
                   ...infer RGoals extends readonly unknown[],
                 ]
-              ? Rep<Y> extends [...Rep<X>, unknown, ...unknown[]]
-                ? Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
-                : Run<Rest, Ans, P, C, [...F, 0]>
+              ? [Rep<X>, Rep<Y>] extends [
+                    infer RX extends readonly 0[],
+                    infer RY extends readonly 0[],
+                  ]
+                ? RY extends readonly [...RX, unknown, ...unknown[]]
+                  ? Run<[[RGoals, A, "?", FDB], ...Rest], Ans, P, C, [...F, 0]>
+                  : Run<Rest, Ans, P, C, [...F, 0]>
+                : never
             : Goals extends readonly [
                   ["neq", infer X extends string | number, infer Y extends string | number],
                   ...infer RGoals extends readonly unknown[],
@@ -332,7 +372,11 @@ export type Run<
                   ["between", infer L extends number, infer H extends number, infer X],
                   ...infer RGoals extends readonly unknown[],
                 ]
-              ? Rep<H> extends [...Rep<L>, ...unknown[]]
+              ? [Rep<L>, Rep<H>] extends [
+                    infer RL extends readonly 0[],
+                    infer RH extends readonly 0[],
+                  ]
+                ? RH extends readonly [...RL, ...unknown[]]
                 // force Sum to a literal now: a lazy Sum<Sum<...>> chain in the
                 // retry goal deepens instantiation once per generated value
                 ? Sum<L, 1> extends infer L2 extends number
@@ -349,6 +393,7 @@ export type Run<
                     : never
                   : never
                 : Run<Rest, Ans, P, C, [...F, 0]>
+                : never
             : Goals extends readonly [
                   ["findall", infer T, infer G, infer R],
                   ...infer RGoals extends readonly unknown[],
@@ -432,7 +477,10 @@ type PumpC<St, M extends readonly 0[]> = M extends readonly [
     : St
   : St;
 
-export type Pump<St, M extends number> = PumpC<St, Rep<M>>;
+export type Pump<St, M extends number> = Rep<M> extends infer RM extends
+  readonly 0[]
+  ? PumpC<St, RM>
+  : never;
 
 export type PumpStart<G, DB extends readonly unknown[]> = {
   p: [[[G], G, "?", DB]];

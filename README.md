@@ -49,8 +49,8 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 | negation, once, meta-call | library clauses; a var as a goal executes its binding | done via cut |
 | asserta / assertz / retract | frame-local DB rebuilt per continuation | done; backtracking undoes changes (SWI asserts survive) |
 | findall/3 | sub-derivation inside a machine step | done, sees the dynamic DB; copy semantics match SWI (free goal vars are not aliased into answers) |
-| arithmetic: plus/3, times/3, lt/2, neq/2 | native number literals, tuple-length math; plus and times are relational (times division must be exact) | done, operands bounded 999, products bounded 9999 |
-| between/3 | choicepoint per value, ascending | done, spans bounded 998 values |
+| arithmetic: plus/3, times/3, lt/2, neq/2 | native number literals, tuple-length math; plus and times are relational (times division must be exact) | done, operands bounded ~3200 (fuel-chunked Rep), products bounded 9999 |
+| between/3 | choicepoint per value, ascending | done, spans bounded 980 values |
 | higher-order goals | var in functor position; `maplist` runs forwards AND backwards | done |
 | surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/05-parse.ts) |
 | prelude | `not/once/member/append/select/length` as `Prelude` | done (src/06-prelude.ts) |
@@ -120,11 +120,11 @@ walls.
 
 | probe | last pass | first fail | error | wall |
 | --- | --- | --- | --- | --- |
-| plus operand value | 999 | 1000 | TS2589 | Rep tail-recursion cap: `Rep<1000>` is 1000 non-fuel-chunked iterations |
-| plus result value (X + n = 2n) | 998 (n=499) | 1000 | TS2589 | same cap, reached through `Rep<2n>` |
+| plus operand value | 3192 | 3193 | TS2589 | was 999 under un-chunked Rep; chunking moved the wall to the instantiation cost of building two ~3.2k tuples |
+| plus result value (X + n = 2n) | 3186 (n=1593) | 3188 | TS2589 | same wall through `Rep<2n>` (was 998) |
 | times product | 9801 (99x99) | 10000 (100x100) | TS2799 | tuple hard cap at 10000 elements |
-| times division (n * Y = n^2) | n=31 (961) | n=32 (1024) | TS2589 | Rep cap again, on the product operand |
-| between span | 998 | 999 | TS2589 | Rep cap on the bound |
+| times division (n * Y = n^2) | n=56 (3136) | n=57 (3249) | TS2589 | same ~3.2k tuple wall on the product operand (was 31) |
+| between span | 980 | 981 | TS2589 | answer volume x per-value bound checks; chunked Rep cost 18 values (was 998) |
 | unification nesting depth `f(f(...))` | 95 | 96 | TS2589 | Unify recurses per nesting level, not fuel-chunked |
 | parser nesting depth `f(f(...))` | 91 | 92 | TS2589 | same shape in the template-literal parser |
 | parser flat arity `f(a, ..., a)` | 500+ | - | - | flat scans are tail-recursive, no wall found |
@@ -276,7 +276,8 @@ Findings, each isolated by its own probe:
   `UnifyArgs` descends non-tail per element pair.
 - Left recursion burns fuel and dies as TS2589 after ~6s: the checker
   cannot hang forever; nontermination degrades to a compile error.
-- Arithmetic values are tuple-length bounded, ~1000.
+- Arithmetic values are tuple-length bounded: ~3200 with fuel-chunked Rep
+  (the builder alias budget), 10000 the absolute tuple cap (TS2799).
 - Reserved functors: `$cut`, `asserta`, `assertz`, `retract`, `findall`,
   `plus`, `times`, `between`, `lt`, `neq`. Cut in a query (rather than a
   clause body) is not transformed. `"?"` is reserved as the frame marker

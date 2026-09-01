@@ -90,9 +90,14 @@ export type Run5<
                       infer WX extends number,
                       infer WY extends number,
                     ]
-                    ? Rep<WY> extends [...Rep<WX>, unknown, ...unknown[]]
-                      ? Run5<[[RGoals, S, "?", FDB], ...Rest], Ans, G0, P, C, [...F, 0]>
-                      : Run5<Rest, Ans, G0, P, C, [...F, 0]>
+                    ? [Rep<WX>, Rep<WY>] extends [
+                        infer RX extends readonly 0[],
+                        infer RY extends readonly 0[],
+                      ]
+                      ? RY extends readonly [...RX, unknown, ...unknown[]]
+                        ? Run5<[[RGoals, S, "?", FDB], ...Rest], Ans, G0, P, C, [...F, 0]>
+                        : Run5<Rest, Ans, G0, P, C, [...F, 0]>
+                      : never
                     : Run5<Rest, Ans, G0, P, C, [...F, 0]>
                   : GW extends readonly ["neq", infer X, infer Y]
                     ? [Walk<X, S>, Walk<Y, S>] extends [

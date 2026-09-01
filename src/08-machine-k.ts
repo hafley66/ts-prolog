@@ -109,9 +109,14 @@ export type RunK<
                         infer WX extends number,
                         infer WY extends number,
                       ]
-                      ? Rep<WY> extends [...Rep<WX>, unknown, ...unknown[]]
-                        ? RunK<[[RGoals, A, S, "?", FDB, [...N, 0]], ...Rest], Ans, K, P, C, [...F, 0]>
-                        : RunK<Rest, Ans, K, P, C, [...F, 0]>
+                      ? [Rep<WX>, Rep<WY>] extends [
+                          infer RX extends readonly 0[],
+                          infer RY extends readonly 0[],
+                        ]
+                        ? RY extends readonly [...RX, unknown, ...unknown[]]
+                          ? RunK<[[RGoals, A, S, "?", FDB, [...N, 0]], ...Rest], Ans, K, P, C, [...F, 0]>
+                          : RunK<Rest, Ans, K, P, C, [...F, 0]>
+                        : never
                       : RunK<Rest, Ans, K, P, C, [...F, 0]>
                     : GW extends readonly ["neq", infer X, infer Y]
                       ? [Walk<X, S>, Walk<Y, S>] extends [
