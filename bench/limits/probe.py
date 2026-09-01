@@ -20,11 +20,16 @@ RESULTS = pathlib.Path(__file__).parent / "results.jsonl"
 TIMEOUT = 240
 
 ENGINE = os.environ.get("ENGINE", "v4")
-MACHINE = (
-    'import type { QueryM5 as QueryM } from "../../../src/07-machine-v5";\n'
-    if ENGINE == "v5"
-    else 'import type { QueryM } from "../../../src/04-machine";\n'
-)
+if ENGINE == "v5":
+    MACHINE = 'import type { QueryM5 as QueryM } from "../../../src/07-machine-v5";\n'
+elif ENGINE.startswith("k"):
+    MACHINE = (
+        'import type { QueryMK } from "../../../src/08-machine-k";\n'
+        "type QueryM<G, DB extends readonly unknown[]> = "
+        f"QueryMK<G, DB, {int(ENGINE[1:])}>;\n"
+    )
+else:
+    MACHINE = 'import type { QueryM } from "../../../src/04-machine";\n'
 HEADER = (
     'import type { Var } from "../../../src/01-term";\n'
     'import type { Unify } from "../../../src/02-unify";\n'

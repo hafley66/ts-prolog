@@ -132,23 +132,28 @@ walls.
 | n-queens | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
 | 5-house zebra clue count | 5 of 14 | 6 | TS2589 | dies in ~4s / 1.3GB; the wall is mem/right search volume x the 35-node houses term, and indexing bought exactly one clue (was 4) |
 
-The v5 structure-sharing experiment (src/07-machine-v5.ts, plus/lt/neq/cut
-only) moves the same walls instead of removing them, in opposite directions
-per workload:
+The v5 structure-sharing experiment (src/07-machine-v5.ts) and the v6
+compaction sweep (src/08-machine-k.ts, `QueryMK<G, DB, K>` compacts every K
+steps) move the same walls instead of removing them, in opposite
+directions per workload. The full curve, v4 at one end and v5 at the
+other:
 
-| probe | v4 (shipped) | v5 (experiment) |
-| --- | --- | --- |
-| flat conjunction goal count | 303 | 1610 |
-| naive reverse list length | 32 | 6 |
-| ancestor chain length | 48 | 43 |
-| n-queens | 5 | 4 |
-| 5-house zebra clue count | 5 | 5, at 2.5x the wall-clock |
+| probe | v4 (shipped) | K=4 | K=16 | K=64 | v5 |
+| --- | --- | --- | --- | --- | --- |
+| flat conjunction goal count | 303 | 600+ | 1000+ | 1600+ | 1610 |
+| naive reverse list length | 32 | 26 | 26 | 6 | 6 |
+| ancestor chain length | 48 | 44 | 43 | 49 | 43 |
+| 5-queens | pass, 4.3s | pass, 2.6s | pass, 3.6s | TS2589 | TS2589 |
+| 5-house zebra clue count | 5, 3.4s | 5, 2.5s | 5, 4.7s | 5, 9.2s | 5, 8.6s |
 
-Same answers, same order, on everything both engines run
-(tests/machine-v5.test-d.ts pins that). The split is the per-step cost
-model: v4 pays O(goal-list) rewriting every step, v5 pays walk chains whose
-depth follows data flow. Accumulator recursion is the worst case for
-chains and the reason v4 stays the shipped engine.
+Same answers, same order, on everything the engines share
+(tests/machine-v5.test-d.ts pins v5). The split is the per-step cost
+model: v4 pays O(goal-list) rewriting every step, v5 pays walk chains
+whose depth follows data flow, v6 interpolates. Two facts fall out of the
+sweep: no K dominates v4 (the accumulator ceiling never recovers past 26),
+and zebra clue 6 dies at every point on the curve, so zebra's wall is
+search volume rather than rewrite strategy. Accumulator recursion is the
+worst case for chains and the reason v4 stays the shipped engine.
 
 Peak checker RSS scales with the grind: passing runs near a wall hit 3-4GB
 (flat n=304: 3.6GB; nrev n=30: 3.5GB). One engine bug fell out of the
@@ -220,6 +225,7 @@ commands live in the git history.
 | 5f2636c (v3) | fuel-chunked trampoline: `Run` and `RTerm` pause every 512 steps with a resumable state marker; wrapper loops restart the tail budget; fresh names from chunk-x-fuel pairs | 4-queens' ~4k steps pass; big states still die | binding constraint is total work, steps x state size, vs the ~5M global instantiation budget |
 | v4 (shipped) | v3 + first-argument indexing: a frame's clause slot starts as a `"?"` marker, resolved on first dispatch to the goal-functor's bucket (`Candidates`/`Bucket`), folded into the same step | 5-queens passes, 6 dies; full zebra still out (5 of 14 clues) | failed clause trials cost a deep `Freshen` each; filtering by functor first bought 10-26% on search problems, and an early two-step version showed one extra machine step per goal costs more than a small DB scan |
 | v5 (experiment, src/07-machine-v5.ts) | structure sharing: goals never rewritten, the branch subst is threaded through `Unify` and resolved into a term once per answer | flat conjunctions 303 -> 1610; nrev 32 -> 6, 5-queens lost | v1's lazy tower, quantified: walk chains grow with data-flow depth, so accumulator recursion re-derives history per step (nrev n=19 grinds 55s before TS2589) while wide-shallow goal lists gain 5x |
+| v6 (experiment, src/08-machine-k.ts) | v5 plus per-branch compaction every K steps: goals + answer rewritten against S, S discarded; K sweeps between v4 (always) and v5 (never) | no K dominates v4: nrev caps at 26 for every K; k4 is faster than v4 wherever both pass | the trade-off is a curve with no free point; compaction cadence buys speed and flat width but never buys back the accumulator ceiling |
 
 Findings, each isolated by its own probe:
 
