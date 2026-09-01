@@ -53,7 +53,7 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 | arithmetic: plus/3, times/3, lt/2, neq/2 | native number literals, tuple-length math; plus and times are relational (times division must be exact) | done, operands bounded ~3200 (fuel-chunked Rep), products bounded 9999 |
 | between/3 | choicepoint per value, ascending | done, spans bounded 980 values |
 | higher-order goals | var in functor position; `maplist` runs forwards AND backwards | done |
-| surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/05-parse.ts) |
+| surface syntax | type-level shift-reduce parser (explicit stack, fuel-chunked): `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/05-parse.ts) |
 | prelude | `not/once/member/append/select/length` as `Prelude` | done (src/06-prelude.ts) |
 | setof | `Distinct<Answers>` post-pass | lite |
 | staged evaluation | `Pump<St, M>` chains paused machine markers across type aliases, one instantiation budget each | done; solves full zebra in 30 stages |
@@ -127,8 +127,8 @@ walls.
 | times division (n * Y = n^2) | n=56 (3136) | n=57 (3249) | TS2589 | same ~3.2k tuple wall on the product operand (was 31) |
 | between span | 980 | 981 | TS2589 | answer volume x per-value bound checks; chunked Rep cost 18 values (was 998) |
 | unification nesting depth `f(f(...))` | 20000+ | none found | - | was 95: worklist Unify + string-encoded vars removed the wall; 20000 deep runs 196s/5GB, bounded by work not depth |
-| parser nesting depth `f(f(...))` | 91 | 92 | TS2589 | the template-literal parser still recurses per nesting level (not yet worklisted) |
-| parser flat arity `f(a, ..., a)` | 500+ | - | - | flat scans are tail-recursive, no wall found |
+| parser nesting depth `f(f(...))` | 2216 | 2217 | TS2589 | was 91: the parser is now shift-reduce with an explicit stack, fuel-chunked at 128 |
+| parser flat arity `f(a, ..., a)` | 2732 | 2733 | TS2589 | was 500+ recursive-descent; a 512-wide fuel tuple cost more than the parse (128 is the sweet spot) |
 | flat conjunction goal count | 303 | 304 | TS2589 | per-step goal-list rewrite, work = steps x state; indexing's per-goal bucket scan cost one unit here (was 304) |
 | naive reverse list length | 32 | 33 | TS2589 | O(n^2) steps on a growing term (was 30 pre-indexing) |
 | ancestor chain length | 45 | 46 | TS2589 | answer tuple + goal list both grow with n (38 pre-indexing, 48 before the worklist unifier's small constant) |

@@ -25,64 +25,101 @@ type MkAtomOrVar<N extends string> = N extends `${infer C}${string}`
       : N
   : N;
 
-// each bare "_" becomes a distinct clause-scoped var; -> [term, counter]
-type RenameWild<T, C extends readonly 0[]> = T extends Var<"_">
-  ? [Var<`_${C["length"]}`>, [...C, 0]]
-  : T extends readonly unknown[]
-    ? RenameWildList<T, C, []>
-    : [T, C];
-
-type RenameWildList<
+type Rev<
   Ts extends readonly unknown[],
-  C extends readonly 0[],
-  Acc extends readonly unknown[],
-> = Ts extends readonly [infer H, ...infer R]
-  ? RenameWild<H, C> extends [infer H2, infer C2 extends readonly 0[]]
-    ? RenameWildList<R, C2, [...Acc, H2]>
-    : never
-  : [Acc, C];
+  Acc extends readonly unknown[] = [],
+> = Ts extends readonly [infer H, ...infer R] ? Rev<R, [H, ...Acc]> : Acc;
 
-// parse one term; -> [Term, rest]. Functor "(" must follow the name directly.
-type PTerm<S extends string> = Trim<S> extends `[${infer R}`
-  ? PList<R>
-  : ReadName<Trim<S>> extends [
-        infer Name extends string,
-        infer Rest extends string,
-      ]
-    ? Rest extends `(${infer R2}`
-      ? PArgs<R2, [Name]>
-      : [MkAtomOrVar<Name>, Rest]
-    : never;
+type ConsFold<
+  RevElems extends readonly unknown[],
+  Tail,
+> = RevElems extends readonly [infer H, ...infer R extends readonly unknown[]]
+  ? ConsFold<R, ["cons", H, Tail]>
+  : Tail;
 
-// [a, b], [H|T], [] -> cons cells / "nil"
-type PList<S extends string> = Trim<S> extends `]${infer R}`
-  ? ["nil", R]
-  : PTerm<S> extends [infer T, infer R extends string]
-    ? Trim<R> extends `,${infer R2}`
-      ? PList<R2> extends [infer Rest2, infer R3]
-        ? [["cons", T, Rest2], R3]
+// shift-reduce term parser: nesting pushes ["A"|"L"|"T", parent, ...] stack
+// frames (args / list elems / list |-tail) instead of recursing
+type PWC<
+  S extends string,
+  Cur extends readonly unknown[],
+  Stack extends readonly unknown[],
+  F extends readonly 0[],
+> = F["length"] extends 128
+  ? { r: S; c: Cur; s: Stack }
+  : Stack extends readonly []
+    ? Cur extends readonly [infer T]
+      ? [T, S]
+      : PWStep<S, Cur, Stack, F>
+    : PWStep<S, Cur, Stack, F>;
+
+type PWStep<
+  S extends string,
+  Cur extends readonly unknown[],
+  Stack extends readonly unknown[],
+  F extends readonly 0[],
+> = Trim<S> extends infer R extends string
+  ? R extends `,${infer R2}`
+    ? PWC<R2, Cur, Stack, [...F, 0]>
+    : R extends `)${infer R2}`
+      ? Stack extends readonly [
+            readonly ["A", infer PCur extends readonly unknown[]],
+            ...infer Pop extends readonly unknown[],
+          ]
+        ? PWC<R2, [...PCur, Cur], Pop, [...F, 0]>
         : never
-      : Trim<R> extends `|${infer R2}`
-        ? PTerm<R2> extends [infer Tail, infer R3 extends string]
-          ? Trim<R3> extends `]${infer R4}`
-            ? [["cons", T, Tail], R4]
+      : R extends `]${infer R2}`
+        ? Stack extends readonly [
+              readonly ["L", infer PCur extends readonly unknown[]],
+              ...infer Pop extends readonly unknown[],
+            ]
+          ? PWC<R2, [...PCur, ConsFold<Rev<Cur>, "nil">], Pop, [...F, 0]>
+          : Stack extends readonly [
+                readonly [
+                  "T",
+                  infer PCur extends readonly unknown[],
+                  infer Elems extends readonly unknown[],
+                ],
+                ...infer Pop extends readonly unknown[],
+              ]
+            ? Cur extends readonly [infer Tail]
+              ? PWC<R2, [...PCur, ConsFold<Rev<Elems>, Tail>], Pop, [...F, 0]>
+              : never
             : never
-          : never
-        : Trim<R> extends `]${infer R3}`
-          ? [["cons", T, "nil"], R3]
-          : never
-    : never;
-
-type PArgs<S extends string, Acc extends readonly unknown[]> = PTerm<S> extends [
-  infer T,
-  infer R extends string,
-]
-  ? Trim<R> extends `,${infer R2}`
-    ? PArgs<R2, [...Acc, T]>
-    : Trim<R> extends `)${infer R3}`
-      ? [[...Acc, T], R3]
-      : never
+        : R extends `|${infer R2}`
+          ? Stack extends readonly [
+                readonly ["L", infer PCur extends readonly unknown[]],
+                ...infer Pop extends readonly unknown[],
+              ]
+            ? PWC<R2, [], [["T", PCur, Cur], ...Pop], [...F, 0]>
+            : never
+          : R extends `[${infer R2}`
+            ? PWC<R2, [], [["L", Cur], ...Stack], [...F, 0]>
+            : ReadName<R> extends [
+                  infer Name extends string,
+                  infer Rest extends string,
+                ]
+              ? Rest extends `(${infer R3}`
+                ? PWC<R3, [Name], [["A", Cur], ...Stack], [...F, 0]>
+                : PWC<Rest, [...Cur, MkAtomOrVar<Name>], Stack, [...F, 0]>
+              : never
   : never;
+
+type PWLoop<
+  S extends string,
+  Cur extends readonly unknown[],
+  Stack extends readonly unknown[],
+> = PWC<S, Cur, Stack, []> extends infer Res
+  ? Res extends {
+      r: infer S2 extends string;
+      c: infer C2 extends readonly unknown[];
+      s: infer St2 extends readonly unknown[];
+    }
+    ? PWLoop<S2, C2, St2>
+    : Res
+  : never;
+
+// parse one term; -> [Term, rest]
+type PTerm<S extends string> = PWLoop<S, [], []>;
 
 type PBody<S extends string> = PTerm<S> extends [infer T, infer R extends string]
   ? Trim<R> extends `,${infer R2}`
@@ -90,17 +127,69 @@ type PBody<S extends string> = PTerm<S> extends [infer T, infer R extends string
     : [T]
   : never;
 
-type RawClause<S extends string> = S extends `${infer H} :- ${infer B}`
-  ? [PTerm<H>[0], ...PBody<B>]
-  : [PTerm<S>[0]];
+type P0<S extends string> = PTerm<S> extends readonly [infer T, string] ? T : never;
 
-export type Clause<S extends string> = RenameWild<RawClause<S>, []>[0];
+type RawClause<S extends string> = S extends `${infer H} :- ${infer B}`
+  ? [P0<H>, ...PBody<B>]
+  : [P0<S>];
+
+// worklist wildcard rename: each bare "_" becomes a distinct clause-scoped
+// var; postorder rebuild with explicit stack, fuel-chunked
+type RWC<
+  In extends readonly unknown[],
+  Done extends readonly unknown[],
+  Stack extends readonly unknown[],
+  C extends readonly 0[],
+  F extends readonly 0[],
+> = F["length"] extends 512
+  ? { i: In; d: Done; s: Stack; c: C }
+  : In extends readonly [infer X, ...infer Xs extends readonly unknown[]]
+    ? X extends readonly unknown[]
+      ? RWC<X, [], [[Xs, Done], ...Stack], C, [...F, 0]>
+      : X extends Var<"_">
+        ? RWC<Xs, [...Done, Var<`_${C["length"]}`>], Stack, [...C, 0], [...F, 0]>
+        : RWC<Xs, [...Done, X], Stack, C, [...F, 0]>
+    : Stack extends readonly [
+          readonly [
+            infer PIn extends readonly unknown[],
+            infer PDone extends readonly unknown[],
+          ],
+          ...infer Rest extends readonly unknown[],
+        ]
+      ? RWC<PIn, [...PDone, Done], Rest, C, [...F, 0]>
+      : [Done, C];
+
+type RWLoop<
+  In extends readonly unknown[],
+  Done extends readonly unknown[],
+  Stack extends readonly unknown[],
+  C extends readonly 0[],
+> = RWC<In, Done, Stack, C, []> extends infer Res
+  ? Res extends {
+      i: infer I2 extends readonly unknown[];
+      d: infer D2 extends readonly unknown[];
+      s: infer S2 extends readonly unknown[];
+      c: infer C2 extends readonly 0[];
+    }
+    ? RWLoop<I2, D2, S2, C2>
+    : Res
+  : never;
+
+type RenameWild<T> = T extends readonly unknown[]
+  ? RWLoop<[T], [], [], []> extends [readonly [infer T2], readonly 0[]]
+    ? T2
+    : never
+  : T extends Var<"_">
+    ? Var<"_0">
+    : T;
+
+export type Clause<S extends string> = RenameWild<RawClause<S>>;
 
 export type Program<Cs extends readonly string[]> = {
   [K in keyof Cs]: Clause<Cs[K]>;
 };
 
-export type Term<S extends string> = RenameWild<PTerm<S>[0], []>[0];
+export type Term<S extends string> = RenameWild<P0<S>>;
 
 export type Query<S extends string, Cs extends readonly string[]> = QueryM<
   Term<S>,
