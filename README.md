@@ -55,13 +55,14 @@ Two input surfaces, one engine. Strings are sugar; the tuple encoding
 | surface syntax | type-level recursive-descent parser: `f(X)`, `[H\|T]`, `_` fresh vars, digit atoms as numbers, `!` | done (src/05-parse.ts) |
 | prelude | `not/once/member/append/select/length` as `Prelude` | done (src/06-prelude.ts) |
 | setof | `Distinct<Answers>` post-pass | lite |
+| staged evaluation | `Pump<St, M>` chains paused machine markers across type aliases, one instantiation budget each | done; solves full zebra in 30 stages |
 
 ## Racing SWI-Prolog
 
 `npm run race`: SWI-Prolog 10.0.2 solves each problem and emits answers as
 JSONL; generated `Equal` assertions force tsgo to solve the same query and
 prove answer-for-answer, order-for-order agreement; a third lane extracts
-answers back out of the checker and diffs them against SWI. All 11 problems,
+answers back out of the checker and diffs them against SWI. All 12 problems,
 all lanes: exact match.
 
 | problem | answers | swipl | tsgo | agree |
@@ -77,6 +78,7 @@ all lanes: exact match.
 | findall + peano count of kids per parent | 3 | 37ms | 437ms | yes |
 | 5-queens (native number arithmetic) | 10 | 31ms | 3962ms | yes |
 | pythagorean triples, legs to 13 (between + times) | 4 | 30ms | 1771ms | yes |
+| full 5-house zebra puzzle, all 14 clues (staged: 30 Pump aliases) | 1 | 30ms | 47s | yes |
 
 Wall clock is mostly process startup on both sides (swipl 67ms, npx+tsgo
 ~400ms warm); net solve is tens of ms for both at these sizes. The real gap
@@ -130,7 +132,8 @@ walls.
 | naive reverse list length | 32 | 33 | TS2589 | O(n^2) steps on a growing term (was 30 pre-indexing) |
 | ancestor chain length | 48 | 49 | TS2589 | answer tuple + goal list both grow with n (was 38 pre-indexing) |
 | n-queens | 5 | 6 | TS2589 | search volume x state size (was 4 pre-indexing) |
-| 5-house zebra clue count | 5 of 14 | 6 | TS2589 | dies in ~4s / 1.3GB; the wall is mem/right search volume x the 35-node houses term, and indexing bought exactly one clue (was 4) |
+| 5-house zebra clue count, single alias | 5 of 14 | 6 | TS2589 | search volume x state; clue reordering (10x fewer SWI inferences), attribute-list and staged-predicate reformulations all still die single-alias |
+| 5-house zebra, staged across 30 aliases | 14 of 14 | - | - | solved: `[["zebra", "german"]]`, 47-86s, ~5GB, raced vs SWI exact |
 
 The v5 structure-sharing experiment (src/07-machine-v5.ts) and the v6
 compaction sweep (src/08-machine-k.ts, `QueryMK<G, DB, K>` compacts every K
@@ -240,9 +243,15 @@ Findings, each isolated by its own probe:
   depth. Fix: defunctionalized postorder rebuild (`RTerm`) with an explicit
   work stack, every step a tail call.
 - Fuel-chunked restart DOES reset the per-evaluation tail cap (v3 runs on
-  it). What nothing resets is the ~5M global instantiation-count budget, so
-  the true bound is total work. Escaping that means leaving the checker,
-  which forfeits running inside `tsc --noEmit`.
+  it). The ~5M instantiation budget looked global, and an earlier version
+  of this document said escaping it meant leaving the checker: WRONG. It
+  is per-alias-evaluation. `Pump<St, M>` advances a paused machine marker
+  M fuel chunks; a chain `S1 = Pump<S0, 1>; S2 = Pump<S1, 1>; ...` gets a
+  fresh budget per alias because each is memoized before the next starts.
+  Staged chain n=100 passes (single-alias ceiling 48) and the full
+  14-clue zebra solves in 30 stages. The remaining walls are wall-clock
+  and RAM (~5GB at zebra scale), plus the per-chunk budget: one 512-step
+  chunk over a big state can still bust 5M alone (staged flat dies at 400).
 - `Equal` on two 30-deep cons chains trips the comparison stack guard
   (TS2321) even when the answer computed fine; deep answers get unrolled to
   flat tuples before comparison.

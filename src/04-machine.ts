@@ -410,6 +410,36 @@ export type RunLoop<
       : never
   : never;
 
+// pump a paused {p,a,c} marker through at most M fuel chunks; chaining Pump
+// across separate aliases probes whether the instantiation budget is per-alias
+type PumpC<St, M extends readonly 0[]> = M extends readonly [
+  0,
+  ...infer M2 extends readonly 0[],
+]
+  ? St extends {
+      p: infer CPs extends readonly unknown[];
+      a: infer Ans extends readonly unknown[];
+      c: infer C extends readonly 0[];
+    }
+    ? Run<CPs, Ans, "", C, []> extends infer R
+      ? R extends {
+          p: infer P2 extends readonly unknown[];
+          a: infer A2 extends readonly unknown[];
+        }
+        ? PumpC<{ p: P2; a: A2; c: [...C, 0] }, M2>
+        : R
+      : never
+    : St
+  : St;
+
+export type Pump<St, M extends number> = PumpC<St, Rep<M>>;
+
+export type PumpStart<G, DB extends readonly unknown[]> = {
+  p: [[[G], G, "?", DB]];
+  a: [];
+  c: [];
+};
+
 export type QueryM<G, DB extends readonly unknown[]> = RunLoop<
   [[[G], G, "?", DB]],
   [],

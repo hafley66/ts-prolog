@@ -220,6 +220,33 @@ PROBLEMS = {
     ),
 }
 
+# zebra runs staged: the 14-clue derivation needs ~12k steps, over the
+# per-alias instantiation budget, so Pump chains 30 aliases (see bench/limits)
+import importlib.util as _ilu
+
+_spec = _ilu.spec_from_file_location("probe", ROOT / "limits" / "probe.py")
+_probe = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_probe)
+
+_zsrc = _probe.p_zebra4(14)
+_zdb = _zsrc[: _zsrc.index("type Out")].replace("../../../src", "../../src")
+_zchain = 'type S0 = PumpStart<["zebra", Var<"Who">], DB>;\n' + "".join(
+    f"type S{i + 1} = Pump<S{i}, 1>;\n" for i in range(30)
+)
+ZHEADER = (
+    'import type { Var } from "../../src/01-term";\n'
+    'import type { Pump, PumpStart } from "../../src/04-machine";\n'
+    'import type { Equal, Expect } from "../../tests/util";\n\n'
+)
+(GEN / "zebra.query.ts").write_text(
+    ZHEADER + _zdb + _zchain + "export type Out = S30;\n"
+)
+_zwant = ", ".join(f'["zebra", "{r["who"]}"]' for r in rows("zebra"))
+(GEN / "zebra.test-d.ts").write_text(
+    ZHEADER + _zdb + _zchain
+    + f"type _match = Expect<Equal<S30, [{_zwant}]>>;\n"
+)
+
 for name, (db, goal, want_row) in PROBLEMS.items():
     (GEN / f"{name}.query.ts").write_text(
         HEADER + db + f"export type Out = QueryM<{goal}, DB>;\n"

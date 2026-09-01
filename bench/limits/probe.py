@@ -183,9 +183,18 @@ def p_parselong(n):
     )
 
 
+# zebra2 = same 14 clues most-constrained-first (SWI oracle: 13517 -> 1395
+# inferences); indices into p_zebra's clue list
+ZORDER = [10, 3, 4, 0, 6, 7, 2, 8, 1, 9, 5, 11, 12, 13]
+
+
+def p_zebra2(n):
+    return p_zebra(n, ZORDER)
+
+
 # n = how many of the 14 zebra clues are included (answer count is not
 # monotone in n, so run sizes directly instead of bisecting)
-def p_zebra(n):
+def p_zebra(n, order=None):
     ctr = [0]
 
     def w():
@@ -232,6 +241,8 @@ def p_zebra(n):
         w(),
         w(),
     ])
+    if order is not None:
+        clues = [clues[i] for i in order]
     body = ",\n    ".join([f'["eq", Var<"Hs">, {skeleton}]'] + clues[:n])
     db = (
         "type DB = [\n"
@@ -251,10 +262,195 @@ def p_zebra(n):
     )
 
 
+# zebra3: five parallel attribute lists joined by index (ix) / offset (r2);
+# each goal carries two 5-lists instead of the 35-node h/5 skeleton
+def p_zebra3(n):
+    ctr = [0]
+
+    def w():
+        ctr[0] += 1
+        return f'Var<"W{ctr[0]}">'
+
+    def lst(*xs):
+        out = '"nil"'
+        for x in reversed(xs):
+            out = f'["cons", {x if x.startswith("Var") else chr(34) + x + chr(34)}, {out}]'
+        return out
+
+    def ix(x, xs, y, ys):
+        return f'["ix", "{x}", Var<"{xs}">, {y if y.startswith("Var") else chr(34) + y + chr(34)}, Var<"{ys}">]'
+
+    def n2(x, xs, y, ys):
+        return f'["n2", "{x}", Var<"{xs}">, "{y}", Var<"{ys}">]'
+
+    clues = [
+        n2("norwegian", "Men", "blue", "Cols"),
+        f'["r2", "green", Var<"Cols">, "white", Var<"Cols">]',
+        ix("green", "Cols", "coffee", "Drinks"),
+        ix("brit", "Men", "red", "Cols"),
+        ix("yellow", "Cols", "dunhill", "Smokes"),
+        n2("horse", "Pets", "dunhill", "Smokes"),
+        ix("dane", "Men", "tea", "Drinks"),
+        ix("beer", "Drinks", "bluemaster", "Smokes"),
+        ix("swede", "Men", "dog", "Pets"),
+        ix("german", "Men", "prince", "Smokes"),
+        ix("pallmall", "Smokes", "bird", "Pets"),
+        n2("blend", "Smokes", "cat", "Pets"),
+        n2("blend", "Smokes", "water", "Drinks"),
+        f'["ix", Var<"Who">, Var<"Men">, "fish", Var<"Pets">]',
+    ]
+    seed = (
+        f'["ls", {lst("norwegian", w(), w(), w(), w())}, {lst(w(), w(), w(), w(), w())}, '
+        f'{lst(w(), w(), "milk", w(), w())}, {lst(w(), w(), w(), w(), w())}, '
+        f'{lst(w(), w(), w(), w(), w())}]'
+    )
+    body = ",\n    ".join(
+        [f'["eq", ["ls", Var<"Men">, Var<"Cols">, Var<"Drinks">, Var<"Smokes">, Var<"Pets">], {seed}]']
+        + clues[:n]
+    )
+    db = (
+        "type DB = [\n"
+        '  [["eq", Var<"E">, Var<"E">]],\n'
+        '  [["ix", Var<"X">, ["cons", Var<"X">, Var<"T0">], Var<"Y">, ["cons", Var<"Y">, Var<"U0">]]],\n'
+        '  [["ix", Var<"X">, ["cons", Var<"H0">, Var<"T0">], Var<"Y">, ["cons", Var<"H1">, Var<"U0">]], ["ix", Var<"X">, Var<"T0">, Var<"Y">, Var<"U0">]],\n'
+        '  [["r2", Var<"X">, ["cons", Var<"X">, Var<"T0">], Var<"Y">, ["cons", Var<"H0">, ["cons", Var<"Y">, Var<"U0">]]]],\n'
+        '  [["r2", Var<"X">, ["cons", Var<"H0">, Var<"T0">], Var<"Y">, ["cons", Var<"H1">, Var<"U0">]], ["r2", Var<"X">, Var<"T0">, Var<"Y">, Var<"U0">]],\n'
+        '  [["n2", Var<"X">, Var<"Xs">, Var<"Y">, Var<"Ys">], ["r2", Var<"X">, Var<"Xs">, Var<"Y">, Var<"Ys">]],\n'
+        '  [["n2", Var<"X">, Var<"Xs">, Var<"Y">, Var<"Ys">], ["r2", Var<"Y">, Var<"Ys">, Var<"X">, Var<"Xs">]],\n'
+        f'  [["zebra", Var<"Who">],\n    {body}],\n'
+        "];\n"
+    )
+    return (
+        db + 'type Out = QueryM<["zebra", Var<"Who">], DB>;\n'
+        'type _c = Expect<Equal<Out["length"] extends number ? true : false, true>>;\n'
+    )
+
+
+# zebra4: zebra3's clues chained through staged predicates z0..z13 so the
+# pending goal list never exceeds [clue, next-stage call]
+def p_zebra4(n):
+    ctr = [0]
+
+    def w():
+        ctr[0] += 1
+        return f'Var<"W{ctr[0]}">'
+
+    def lst(*xs):
+        out = '"nil"'
+        for x in reversed(xs):
+            out = f'["cons", {x if x.startswith("Var") else chr(34) + x + chr(34)}, {out}]'
+        return out
+
+    def ix(x, xs, y, ys):
+        return f'["ix", "{x}", Var<"{xs}">, "{y}", Var<"{ys}">]'
+
+    def n2(x, xs, y, ys):
+        return f'["n2", "{x}", Var<"{xs}">, "{y}", Var<"{ys}">]'
+
+    clues = [
+        n2("norwegian", "Men", "blue", "Cols"),
+        '["r2", "green", Var<"Cols">, "white", Var<"Cols">]',
+        ix("green", "Cols", "coffee", "Drinks"),
+        ix("brit", "Men", "red", "Cols"),
+        ix("yellow", "Cols", "dunhill", "Smokes"),
+        n2("horse", "Pets", "dunhill", "Smokes"),
+        ix("dane", "Men", "tea", "Drinks"),
+        ix("beer", "Drinks", "bluemaster", "Smokes"),
+        ix("swede", "Men", "dog", "Pets"),
+        ix("german", "Men", "prince", "Smokes"),
+        ix("pallmall", "Smokes", "bird", "Pets"),
+        n2("blend", "Smokes", "cat", "Pets"),
+        n2("blend", "Smokes", "water", "Drinks"),
+        '["ix", Var<"Who">, Var<"Men">, "fish", Var<"Pets">]',
+    ][:n]
+    args = 'Var<"Men">, Var<"Cols">, Var<"Drinks">, Var<"Smokes">, Var<"Pets">, Var<"Who">'
+    stages = [
+        f'  [["z{k}", {args}],\n    {clue},\n    ["z{k + 1}", {args}]],\n'
+        for k, clue in enumerate(clues)
+    ]
+    seed = (
+        f'{lst("norwegian", w(), w(), w(), w())}, {lst(w(), w(), w(), w(), w())}, '
+        f'{lst(w(), w(), "milk", w(), w())}, {lst(w(), w(), w(), w(), w())}, '
+        f'{lst(w(), w(), w(), w(), w())}'
+    )
+    db = (
+        "type DB = [\n"
+        '  [["ix", Var<"X">, ["cons", Var<"X">, Var<"T0">], Var<"Y">, ["cons", Var<"Y">, Var<"U0">]]],\n'
+        '  [["ix", Var<"X">, ["cons", Var<"H0">, Var<"T0">], Var<"Y">, ["cons", Var<"H1">, Var<"U0">]], ["ix", Var<"X">, Var<"T0">, Var<"Y">, Var<"U0">]],\n'
+        '  [["r2", Var<"X">, ["cons", Var<"X">, Var<"T0">], Var<"Y">, ["cons", Var<"H0">, ["cons", Var<"Y">, Var<"U0">]]]],\n'
+        '  [["r2", Var<"X">, ["cons", Var<"H0">, Var<"T0">], Var<"Y">, ["cons", Var<"H1">, Var<"U0">]], ["r2", Var<"X">, Var<"T0">, Var<"Y">, Var<"U0">]],\n'
+        '  [["n2", Var<"X">, Var<"Xs">, Var<"Y">, Var<"Ys">], ["r2", Var<"X">, Var<"Xs">, Var<"Y">, Var<"Ys">]],\n'
+        '  [["n2", Var<"X">, Var<"Xs">, Var<"Y">, Var<"Ys">], ["r2", Var<"Y">, Var<"Ys">, Var<"X">, Var<"Xs">]],\n'
+        + "".join(stages)
+        + f'  [["z{n}", {args}]],\n'
+        f'  [["zebra", Var<"Who">], ["z0", {seed}, Var<"Who">]],\n'
+        "];\n"
+    )
+    return (
+        db + 'type Out = QueryM<["zebra", Var<"Who">], DB>;\n'
+        'type _c = Expect<Equal<Out["length"] extends number ? true : false, true>>;\n'
+    )
+
+
+# staged flat-conjunction: same DB as p_flat, but the run is pumped through
+# a chain of type aliases, one fuel chunk per alias
+def p_staged(n):
+    stages = n * 3 // 512 + 6
+    db = f'type DB = [\n  [["t"]],\n  [["main"], {", ".join(chr(91) + chr(34) + "t" + chr(34) + chr(93) for _ in range(n))}],\n];\n'
+    chain = 'type S0 = PumpStart<["main"], DB>;\n' + "".join(
+        f"type S{i + 1} = Pump<S{i}, 1>;\n" for i in range(stages)
+    )
+    return (
+        'import type { Pump, PumpStart } from "../../../src/04-machine";\n'
+        + db + chain
+        + f'type _c = Expect<Equal<S{stages} extends readonly unknown[] ? S{stages}["length"] : "unfinished", 1>>;\n'
+    )
+
+
+def p_stagedchain(n):
+    stages = n * n // 300 + 8
+    facts = "".join(f'  [["par", "n{i}", "n{i + 1}"]],\n' for i in range(n))
+    db = (
+        "type DB = [\n" + facts +
+        '  [["anc", Var<"X">, Var<"Y">], ["par", Var<"X">, Var<"Y">]],\n'
+        '  [["anc", Var<"X">, Var<"Z">], ["par", Var<"X">, Var<"Y">], ["anc", Var<"Y">, Var<"Z">]],\n'
+        "];\n"
+    )
+    chain = 'type S0 = PumpStart<["anc", "n0", Var<"X">], DB>;\n' + "".join(
+        f"type S{i + 1} = Pump<S{i}, 1>;\n" for i in range(stages)
+    )
+    return (
+        'import type { Pump, PumpStart } from "../../../src/04-machine";\n'
+        + db + chain
+        + f'type _c = Expect<Equal<S{stages} extends readonly unknown[] ? S{stages}["length"] : "unfinished", {n}>>;\n'
+    )
+
+
+# full 14-clue zebra4 DB pumped through n Pump aliases
+def p_zebra5(n):
+    src = p_zebra4(14)
+    db = src[: src.index("type Out")]
+    chain = 'type S0 = PumpStart<["zebra", Var<"Who">], DB>;\n' + "".join(
+        f"type S{i + 1} = Pump<S{i}, 1>;\n" for i in range(n)
+    )
+    return (
+        'import type { Pump, PumpStart } from "../../../src/04-machine";\n'
+        + db + chain
+        + f'type _c = Expect<Equal<S{n} extends readonly unknown[] ? S{n} : "unfinished", '
+        f'[["zebra", "german"]]>>;\n'
+    )
+
+
 PROBES = {
+    "zebra3": p_zebra3,
+    "zebra4": p_zebra4,
+    "staged": p_staged,
+    "stagedchain": p_stagedchain,
+    "zebra5": p_zebra5,
     "parsedeep": p_parsedeep,
     "parselong": p_parselong,
     "zebra": p_zebra,
+    "zebra2": p_zebra2,
     "chain": p_chain,
     "nrev": p_nrev,
     "flat": p_flat,
